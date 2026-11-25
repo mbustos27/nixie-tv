@@ -82,9 +82,10 @@ Glacier and doesn't share its settings. On a Fire TV, follow [On Fire TV](#on-fi
 
 ### On Fire TV
 
-**Not yet tried on a Fire TV.** Fire TV runs the same APK as Google TV, built for Fire OS but tested only on Android TV
-emulators at Fire OS 7's and 8's Android levels ([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)). If you try it, a
-[report](#report-a-problem) of what works and what doesn't helps.
+**Not yet tried on a Fire TV.** Fire OS 7 and 8 are built on Android 9 and 11, which Nixie for TV supports, so the same
+APK as on Google TV should run; its checks on Fire TV emulators haven't run yet
+([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)). If you try it, a [report](#report-a-problem) of what works and what
+doesn't helps.
 
 **Which Fire TVs:** check Settings › My Fire TV › About › Fire TV Stick (or your device's name) › Software Version.
 
