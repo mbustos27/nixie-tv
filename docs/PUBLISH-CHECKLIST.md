@@ -183,8 +183,9 @@ short and never changes.
     - Researched and not chosen: TinyURL (an account for an alias, edits paid), a GitHub Pages meta refresh (a plain
       download tool saves the HTML), git.io (gone since 2022), a custom domain (a yearly fee).
     - Recorded: is.gd `nixietv`: created 2026-11-25, 2:26 PM, a 301 to the stable address (1.0.0 checked: over http
-      and https it ends at a 200 with the APK, SHA-256 `af509938…13b5`, the `.sha256`'s); Downloader code: _(the
-      owner's form)_.
+      and https it ends at a 200 with the APK, SHA-256 `af509938…13b5`, the `.sha256`'s); Downloader code: `6673217`
+      (aftv.news/6673217), made by the owner 2026-11-25 with the stable address as its destination (checked: its page
+      sends a browser to that address).
 33. **C: the docs say it:**
     - README's Install section: "On the TV: type <short link> into Downloader or a similar app" (done at 1.0);
     - the 1.0 release notes, at the top (done at 1.0);
