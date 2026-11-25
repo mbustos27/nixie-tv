@@ -146,6 +146,87 @@ Settings › Appearance › Theme switches at once, and your place is kept.
 
 Debug builds also offer Glacier's own look, for comparing.
 
+<table>
+  <tr>
+    <th width="33%">Drive-in</th>
+    <th width="33%">Cinematic</th>
+    <th width="33%">Editorial</th>
+  </tr>
+  <tr>
+    <td>
+      <a href="docs/screenshots/home-drive-in.webp">
+        <img src="docs/screenshots/thumbs/home-drive-in.webp"
+        alt="Home in the Drive-in theme: Charade on a drive-in screen under a starry sky, the Continue watching row
+        with Charade and The General, and The Beverly Hillbillies in Up next">
+      </a><br>Home
+    </td>
+    <td>
+      <a href="docs/screenshots/home-cinematic.webp">
+        <img src="docs/screenshots/thumbs/home-cinematic.webp"
+        alt="Home in the Cinematic theme: a still from Charade fills the screen behind its title, with Continue
+        watching and Up next below">
+      </a><br>Home
+    </td>
+    <td>
+      <a href="docs/screenshots/home-editorial.webp">
+        <img src="docs/screenshots/thumbs/home-editorial.webp"
+        alt="Home in the Editorial theme: Charade in a serif headline beside its still, and the numbered sections
+        01 Continue watching and 02 Up next">
+      </a><br>Home
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="docs/screenshots/movie-drive-in.webp">
+        <img src="docs/screenshots/thumbs/movie-drive-in.webp"
+        alt="Charade's page in the Drive-in theme: the film on a drive-in screen against a desert sunset, Resume
+        with 65 minutes left, its cast, and More like this">
+      </a><br>A film
+    </td>
+    <td>
+      <a href="docs/screenshots/movie-cinematic.webp">
+        <img src="docs/screenshots/thumbs/movie-cinematic.webp"
+        alt="Charade's page in the Cinematic theme: its still fills the page behind the title, with Resume, Play
+        from the start and Trailer, its cast, and More like this">
+      </a><br>A film
+    </td>
+    <td>
+      <a href="docs/screenshots/movie-editorial.webp">
+        <img src="docs/screenshots/thumbs/movie-editorial.webp"
+        alt="Charade's page in the Editorial theme: a serif title over a tinted still, its details in small
+        capitals, Resume, its cast, and More like this">
+      </a><br>A film
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="docs/screenshots/collection-drive-in.webp">
+        <img src="docs/screenshots/thumbs/collection-drive-in.webp"
+        alt="The Silent era collection in the Drive-in theme: A Trip to the Moon on the drive-in screen with posters
+        fanned out in front, 2 of 6 watched, Resume The General, and the six films in order">
+      </a><br>A collection
+    </td>
+    <td>
+      <a href="docs/screenshots/collection-cinematic.webp">
+        <img src="docs/screenshots/thumbs/collection-cinematic.webp"
+        alt="The Silent era collection in the Cinematic theme: the moon from A Trip to the Moon behind the title,
+        the posters fanned out, and the six films from 1902 to 1927">
+      </a><br>A collection
+    </td>
+    <td>
+      <a href="docs/screenshots/collection-editorial.webp">
+        <img src="docs/screenshots/thumbs/collection-editorial.webp"
+        alt="The Silent era collection in the Editorial theme: a serif title over a tinted still, Resume The
+        General, and the six films under Movies in this collection">
+      </a><br>A collection
+    </td>
+  </tr>
+</table>
+
+Taken on the Android TV emulator, against the TV test server ([testing/fakeserver](testing/fakeserver)) serving
+the public-domain films of Nixie for Windows' [showcase library](https://github.com/mbustos27/nixie/tree/main/tools/ui-harness/fakeserver/showcase)
+(credits under [Licence](#licence)).
+
 ## What it does
 
 - **Home** shows Continue watching, then Up next.
@@ -233,3 +314,47 @@ GPL-3.0-or-later ([LICENSE](LICENSE)), as Glacier. Every copyright and REUSE not
 "Glacier contributors", Nixie's own files "Nixie contributors" ([REUSE.toml](REUSE.toml)); third-party parts keep
 their licences, with the texts in [LICENSES/](LICENSES/). Nixie for TV is not affiliated with the Jellyfin project or
 with Glacier's authors. Android TV and Google TV are trademarks of Google LLC.
+
+The screenshots show public-domain films, Charade (1963), The General (1926), His Girl Friday (1940), The Cabinet of
+Dr. Caligari (1920), The Kid (1921), Sherlock Jr. (1924), A Trip to the Moon (1902), Metropolis (1927) and Night of
+the Living Dead (1968), and The Beverly Hillbillies (1962) through a public-domain press photo. The stills and posters
+come from Wikimedia Commons, and the overviews are our own. Public domain covers the pictures; the titles' logos and
+trademarks on the posters are not covered by it. The app scales, cuts and tints the pictures on screen.
+
+<details>
+<summary>All 12 pictures, with their authors, licences and sources</summary>
+
+- **The Beverly Hillbillies (1962)**, press photo: CBS Television. Public domain (PD-US-no notice). Changes: reduced
+  to 1080 px high, in the middle of a dark 1920 x 1080 frame.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Donna_Douglas_in_%22Beverly_Hillbillies%22_%281963_Press_photo%29.jpg)
+- **The Cabinet of Dr. Caligari (1920)**, poster: Atelier Ledl Bernhard. Public domain (PD-old-80-expired). Changes:
+  reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Das_Cabinet_des_Dr._Caligari.JPG)
+- **Charade (1963)**, still: Stanley Donen. Public domain (PD-US-not renewed). Changes: cut to 16:9, enlarged to 1920
+  x 1080.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Charade_1963_Audrey_Hepburn_and_Cary_Grant.jpg)
+- **The General (1926)**, still: Buster Keaton Productions. Public domain (PD-1923). Changes: cut to 16:9, reduced to
+  1920 x 1080.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Buster_Keaton_drives_a_two-man,_railroad_handcar_in_The_General.jpg)
+- **The General (1926)**, poster: United Artists. Public domain (PD-1923). Changes: reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_General_%281926%29_-_Movie_Poster_2.png)
+- **His Girl Friday (1940)**, poster: Columbia Pictures. Public domain (PD-US-not renewed). Changes: reduced to 600 px
+  wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:His_Girl_Friday_%281940_poster%29_crop.jpg)
+- **The Kid (1921)**, poster: First National. Public domain (PD-1923, PD-scan). Changes: reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_Kid_%281921%29_poster.jpg)
+- **Metropolis (1927)**, poster: Boris Bilinsky. Public domain (PD-Art / PD-old-70). Changes: reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Boris_Bilinski_-_Filmplakat_f%C3%BCr_Metropolis_restored.jpg)
+- **Night of the Living Dead (1968)**, poster: author unknown. Public domain (PD-US-no notice). Changes: reduced to
+  600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Night_Of_The_Living_Dead_%281968%29_-_Poster.jpg)
+- **Sherlock Jr. (1924)**, poster: author unknown. Public domain (PD-1923). Changes: reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sherlock_jr_poster.jpg)
+- **A Trip to the Moon (1902)**, still: Georges Méliès. Public domain (PD-old-80-expired). Changes: cut to 16:9,
+  reduced to 1920 x 1080.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Melies_color_Voyage_dans_la_lune.jpg)
+- **A Trip to the Moon (1902)**, poster: Georges Méliès (sketch for the poster). Public domain (PD-old-70-expired).
+  Changes: reduced to 600 px wide.
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Voyage_dans_la_Lune_affiche.jpg)
+
+</details>

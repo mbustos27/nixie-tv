@@ -109,3 +109,11 @@ path = ["docs/brand/*.svg", "docs/brand/*.png"]
 precedence = "override"
 SPDX-FileCopyrightText = ["2026 Nixie contributors", "2011 Vernon Adams"]
 SPDX-License-Identifier = "GPL-3.0-or-later AND OFL-1.1"
+
+# Nixie: the README's screenshots, the app's screens (Glacier's and Nixie's work). The stills and posters in them are
+# public domain, from Wikimedia Commons; README.md credits each one under Licence.
+[[annotations]]
+path = "docs/screenshots/**"
+precedence = "override"
+SPDX-FileCopyrightText = ["Glacier contributors", "2026 Nixie contributors"]
+SPDX-License-Identifier = "GPL-3.0-or-later"
