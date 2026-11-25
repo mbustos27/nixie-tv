@@ -182,11 +182,13 @@ short and never changes.
       is public. C records it here.
     - Researched and not chosen: TinyURL (an account for an alias, edits paid), a GitHub Pages meta refresh (a plain
       download tool saves the HTML), git.io (gone since 2022), a custom domain (a yearly fee).
-    - Recorded: is.gd `nixietv`: _(at 1.0)_; Downloader code: _(at 1.0)_.
+    - Recorded: is.gd `nixietv`: created 2026-11-25, 2:26 PM, a 301 to the stable address (1.0.0 checked: over http
+      and https it ends at a 200 with the APK, SHA-256 `af509938…13b5`, the `.sha256`'s); Downloader code: _(the
+      owner's form)_.
 33. **C: the docs say it:**
-    - README's Install section: "On the TV: type <short link> into Downloader or a similar app";
-    - the 1.0 release notes, at the top;
-    - the Settings › System screen, beside the source link, if it costs one string (else it waits for 1.0.1).
+    - README's Install section: "On the TV: type <short link> into Downloader or a similar app" (done at 1.0);
+    - the 1.0 release notes, at the top (done at 1.0);
+    - the Settings › System screen, beside the source link: waits for 1.0.1.
 34. **C, then O: check that the short link downloads the APK:**
     - **C, from a PC:** following the link's redirects ends at a 200 with an APK, whose SHA-256 matches the `.sha256`.
     - **O, on the box:** typed into Downloader, it installs the release.

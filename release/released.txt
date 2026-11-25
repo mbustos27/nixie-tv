@@ -1,0 +1,2 @@
+# Released versions: <version> <versionCode> <sha256 of the APK>. Written by nixie-release record.
+1.0.0 1000099 af5099389d9fafb448041c815396c6d61870e689c7b080f7b0a88127e5bf13b5

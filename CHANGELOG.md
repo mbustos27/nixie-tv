@@ -24,11 +24,11 @@ versions, Glacier's release notes up to that version are kept as the base.
 
 ## [Unreleased]
 
-## [1.0.0] - <release date>
+## [1.0.0] - 2026-11-25
 
 ### Install
-- On the TV: type `<is.gd link>` into Downloader or a similar downloader app, or enter the Downloader code
-  `<Downloader code>`. Android asks once to let that app install apps
+- On the TV: type `is.gd/nixietv` into Downloader or a similar downloader app (it always gets the newest release).
+  Android asks once to let that app install apps
 - Or download `Nixie-TV-1.0.0.apk` below and install it with a file manager on the box, or from a computer with
   `adb install Nixie-TV-1.0.0.apk`. `Nixie-TV-1.0.0.apk.sha256` is its checksum (SECURITY.md shows how to compare)
 - You need Android TV or Google TV, Android 9 or newer, on an ARM box (32- or 64-bit), and an account on a Jellyfin

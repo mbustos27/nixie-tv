@@ -24,8 +24,9 @@ in an app store. Each release has three files:
 - **`nixie-tv.apk`**, the same app under a name that never changes, so
   `https://github.com/mbustos27/nixie-tv/releases/latest/download/nixie-tv.apk` is always the newest release.
 
-Install the APK with a downloader or file-manager app on the box (Android asks once to let that app install apps), or
-from a computer with `adb install Nixie-TV-<version>.apk`. It installs beside Glacier and doesn't share its settings.
+**On the TV:** type `is.gd/nixietv` into Downloader or a similar downloader app; it always gets the newest release
+(Android asks once to let that app install apps). Or install the APK with a file-manager app on the box, or from a
+computer with `adb install Nixie-TV-<version>.apk`. It installs beside Glacier and doesn't share its settings.
 Fire TV comes later ([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)).
 
 **Updates:** Nixie checks for a new release at every start (Settings › System › Check for updates automatically turns
