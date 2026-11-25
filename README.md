@@ -1,4 +1,20 @@
-# Nixie for TV
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/banner-light.svg">
+  <img alt="Nixie for TV: a Jellyfin app for Android TV and Google TV, built for the remote"
+    src="docs/brand/banner-dark.svg" width="100%">
+</picture>
+
+<p>
+  <a href="https://github.com/mbustos27/nixie-tv/releases/latest"><img alt="Latest release"
+    src="https://img.shields.io/github/v/release/mbustos27/nixie-tv?style=flat-square&label=release&labelColor=1A0710&color=BC1E47"></a>
+  <a href="https://github.com/mbustos27/nixie-tv/blob/main/LICENSE"><img alt="Licence: GPL-3.0"
+    src="https://img.shields.io/github/license/mbustos27/nixie-tv?style=flat-square&label=licence&labelColor=1A0710&color=BC1E47"></a>
+  <a href="#install"><img alt="Platform: Android TV and Google TV, Android 9 or newer"
+    src="https://img.shields.io/badge/platform-Android%20TV%20%7C%20Google%20TV-BC1E47?style=flat-square&labelColor=1A0710"></a>
+  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv"><img alt="Based on Glacier v0.10.1"
+    src="https://img.shields.io/badge/based%20on-Glacier%20v0.10.1-7A1530?style=flat-square&labelColor=1A0710"></a>
+</p>
 
 **Nixie for TV is a Jellyfin app for Android TV and Google TV: Nixie's themes on the big screen, with a player built
 for the remote.** It is the TV sibling of [Nixie for Windows](https://github.com/mbustos27/nixie).
@@ -8,6 +24,41 @@ GPL-3.0.** Glacier brings the app itself: sign-in, libraries, item pages, search
 rules, skips, trickplay and next-episode countdown, profiles, music, photos and live TV. Nixie adds its themes as a
 layer over Glacier's screens, and its own features on top. Glacier's own README, store listings and website belong to
 Glacier; see its repository. Please don't report problems in Nixie for TV to Glacier's authors: they can't fix Nixie.
+
+## How it differs from Glacier
+
+Nixie for TV is Glacier v0.10.1 underneath. Most of what the app can do is Glacier's work; Nixie changes how it looks,
+a set of everyday behaviours, and where it updates from. The full, file-by-file list is in
+[DIVERGENCE.md](DIVERGENCE.md).
+
+**Glacier's, unchanged:** the Media3 player and its device profiles, track rules, styled ASS subtitles, DTS and TrueHD
+decoding, trickplay, frame-rate matching and the next-episode countdown; libraries with sort and filter; item pages;
+search; profiles with PINs and age limits; music, photos, live TV with a guide, and Seerr requests.
+
+**Changed or added by Nixie:**
+
+| Area | Glacier v0.10.1 | Nixie for TV |
+|---|---|---|
+| Look | Glacier's own design | Three themes, switched at once: Drive-in (default), Cinematic and Editorial. Glacier's look only in debug builds |
+| Name and artwork | Glacier | Nixie's name, icon and banner in every string (English, German, Spanish); About says "Based on Glacier" |
+| Home | One merged Continue watching row | Continue watching, then Up next, as two rows |
+| Continue watching | No way to remove a title | Hold OK to remove a title, with Undo for 10 seconds |
+| Skips | The server's media segments | The server's segments, the file's chapter names, and skips learned from what you skip by hand; online lookups off until you turn them on |
+| Sign-in | Password or Quick Connect | Quick Connect first when the server offers it; password as the fallback |
+| Big libraries | The first page waits for the list to be counted; an A–Z jump needs the library's index in memory | The first page comes uncounted and shows at once; an A–Z jump asks the server where the letter starts |
+| Text size | Fixed at the default font scale | Follows the TV's font size, up to 1.3× |
+| Low-memory boxes | Live blur and drop shadows | No live blur or offscreen shadows on 2 GB boxes |
+| Trailers | YouTube embed under Glacier's site | youtube-nocookie under Nixie's own origin |
+| Updates | Glacier's releases and app stores | This repository's releases only; takes only `Nixie-TV-<version>.apk` and checks its SHA-256 |
+| Server's device list | "Glacier" | "Nixie for TV" |
+| Publishing | Store, website and funding workflows | Removed; nothing publishes to or pings Glacier |
+
+Nixie's changes live in its own modules (`theme/*`, `io.github.mbustos27` packages) and in small hooks marked
+`// Nixie:` inside Glacier's files, so each Glacier release can still be merged ([Glacier's updates](#glaciers-updates)).
+
+**How it differs from Nixie for Windows:** it's a separate app. Nixie for Windows is a WinUI 3 client playing through
+mpv with four themes; Nixie for TV is Kotlin and Compose for TV on Glacier, plays through Media3, and has three of
+the four themes (no Classic).
 
 ## Install
 
