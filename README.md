@@ -64,7 +64,7 @@ the four themes (no Classic).
 
 | You need | |
 |---|---|
-| A TV box or TV | Android TV or Google TV, Android 9 or newer, an ARM processor (32- or 64-bit) |
+| A TV box or TV | Android TV or Google TV, Android 9 or newer, an ARM processor (32- or 64-bit); or a Fire TV on Fire OS 7 or 8 ([On Fire TV](#on-fire-tv)) |
 | A server | A Jellyfin server, version 12.0 or newer, and an account on it |
 
 Nixie for TV comes from this repository's [releases](https://github.com/mbustos27/nixie-tv/releases) only; it is not
@@ -78,8 +78,48 @@ in an app store. Each release has three files:
 **On the TV:** type `is.gd/nixietv` into Downloader or a similar downloader app, or enter the code `6673217` in
 Downloader. Either way you get the newest release (Android asks once to let that app install apps). Or install the APK
 with a file-manager app on the box, or from a computer with `adb install Nixie-TV-<version>.apk`. It installs beside
-Glacier and doesn't share its settings.
-Fire TV comes later ([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)).
+Glacier and doesn't share its settings. On a Fire TV, follow [On Fire TV](#on-fire-tv) below.
+
+### On Fire TV
+
+**Not yet tried on a Fire TV.** Fire TV runs the same APK as Google TV, built for Fire OS but tested only on Android TV
+emulators at Fire OS 7's and 8's Android levels ([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)). If you try it, a
+[report](#report-a-problem) of what works and what doesn't helps.
+
+**Which Fire TVs:** check Settings › My Fire TV › About › Fire TV Stick (or your device's name) › Software Version.
+
+| Your Fire TV runs | Devices | Nixie for TV |
+|---|---|---|
+| Fire OS 7 | Fire TV Stick 3rd gen, Stick Lite, Stick HD (2024), Stick 4K Max 1st gen, Cube 2nd and 3rd gen | Should run |
+| Fire OS 8 | Fire TV Stick 4K 2nd gen (sold as 4K Plus), Stick 4K Max 2nd gen | Should run |
+| Fire OS 14 or 16 | Mostly Fire TV televisions | Not checked yet |
+| Vega OS | Fire TV Stick 4K Select (2025), Stick HD (2026), Stick 4K 3rd gen (2026) | **Can't run it**: Vega runs no Android apps and allows no sideloading |
+
+**Install it:**
+
+1. **Get Downloader.** On the Fire TV's home, search for **Downloader** (by AFTVnews) and install it from Amazon's
+   Appstore.
+2. **Turn on Developer options.** Settings › My Fire TV › About, then select your device's name (for example
+   "Fire TV Stick 4K") **seven times**, until it says you're a developer. Press Back.
+3. **Let Downloader install apps.** Settings › My Fire TV › Developer options › **Install unknown apps** ›
+   **Downloader** › On. (On older Fire OS this is **Apps from Unknown Sources** › On.) If Downloader isn't in the
+   list, update the Fire TV first (Settings › My Fire TV › About › Check for Updates): a Fire OS bug hid it there until
+   a fix in September 2026.
+4. **Download Nixie.** Open Downloader, enter the code **`6673217`** (or `is.gd/nixietv`), select Go, then **Install**
+   when Android asks. Downloader can delete the APK file afterwards; the app stays.
+5. **Open Nixie for TV** from Your Apps & Channels (hold Home › Apps). To pin it to the home row, highlight it, press
+   the menu (☰) button and choose Move to front.
+
+**Updates** work as on Google TV: the first time Nixie offers an update, Android asks to let **Nixie for TV** install
+apps (Developer options › Install unknown apps › Nixie for TV › On).
+
+**Not checked on a Fire TV yet:**
+
+- Dolby audio passthrough to a receiver. DTS and TrueHD are decoded in the app, as on Google TV.
+- HDR and Dolby Vision output, and switching the refresh rate to match the video.
+- Speed on 1 GB sticks.
+- The Continue watching row on the TV's home screen: Fire TV's home doesn't show other apps' rows, so it stays in
+  the app.
 
 **Updates:** Nixie checks for a new release at every start (Settings › System › Check for updates automatically turns
 that off; Check for updates checks at once). It asks GitHub's releases API for this repository's releases and nothing
