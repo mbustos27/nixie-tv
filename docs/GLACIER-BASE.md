@@ -11,8 +11,9 @@ In Glacier paths below, `…/` is `src/main/java/io/github/glacier_jellyfin/andr
 
 Glacier uses SDK 1.9.4 and supports **Jellyfin 12.0 and newer** (`core/jellyfin/…/core/jellyfin/ServerInfo.kt`);
 older servers show greyed out and connect only after a confirmation. The plan pinned SDK 1.8.12 to serve 10.11 too.
-The servers Nixie was checked on run 12.x, so this costs nothing today. Tests use the fake server's `jellyfin-12`
-profile; the `jellyfin-10.11` profile and the 10.11.11 QA server become "below the minimum" checks.
+The servers Nixie was checked on run 12.x, so this costs nothing today. Tests and the basics gate run against Jellyfin
+12.4 (the fake server's `jellyfin-12` profile and the gate's throwaway servers); the `jellyfin-10.11` and
+`jellyfin-10.10` profiles and the 10.11.11 QA server are below the minimum, and no app test or gate check uses them.
 
 ## The plan's phases 1 to 4 against Glacier
 

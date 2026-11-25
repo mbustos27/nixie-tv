@@ -13,8 +13,13 @@ from; never edited here), so a change in the desktop repository cannot break the
 | Profile | Version | Token rules | GET `/QuickConnect/Initiate` | Use |
 |---|---|---|---|---|
 | `jellyfin-12` | 12.4.0 | strict: only `Authorization: MediaBrowser Token=...` (and `ApiKey`) | 405 | the default |
-| `jellyfin-10.11` | 10.11.11 | legacy: `X-Emby-*` and `api_key` too | works | the oldest line SDK 1.8.12 serves |
-| `jellyfin-10.10` | 10.10.7 | legacy | works | below the minimum: the app must refuse it in plain words |
+| `jellyfin-10.11` | 10.11.11 | legacy: `X-Emby-*` and `api_key` too | works | below the 12.0 minimum |
+| `jellyfin-10.10` | 10.10.7 | legacy | works | below the 12.0 minimum |
+
+The app supports Jellyfin 12.0 and newer (`MinimumServerVersion` in `core/jellyfin`'s `ServerInfo.kt`, Glacier's rule
+with Jellyfin SDK 1.9.4): an older server shows as not supported and connects only after **Connect anyway**. The two
+legacy profiles come from the plan's SDK 1.8.12, which served 10.11 too; only this folder's own tests use them, and no
+app test or gate check runs against an older server.
 
 All three keep **one token per DeviceId**: a sign-in revokes the earlier token issued to the same DeviceId, and a
 Quick Connect token belongs to the DeviceId sent with Initiate. This is why Nixie mints a per-attempt DeviceId.

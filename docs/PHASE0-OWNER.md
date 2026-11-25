@@ -29,8 +29,8 @@ $bt  = "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0"
 The version of the server you use was already on record, so there's nothing to do and no dashboard to open (most
 people who use a Jellyfin server don't run it).
 
-It decides nothing today: Nixie pins the Jellyfin SDK line that serves both 10.11 and 12.x. It tells us when the
-move to the 12-only SDK line is safe. No tool signs in to the server to read it.
+It decided one thing: on Glacier (since 2026-11-21) Nixie for TV uses Glacier's Jellyfin SDK line (1.9.4), which
+supports Jellyfin 12.0 and newer only, and the server you use runs 12.x. No tool signs in to the server to read it.
 
 ## 2. Create the release key
 

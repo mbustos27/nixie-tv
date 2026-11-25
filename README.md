@@ -67,6 +67,10 @@ the four themes (no Classic).
 | A TV box or TV | Android TV or Google TV, Android 9 or newer, an ARM processor (32- or 64-bit); or a Fire TV on Fire OS 7 or 8 ([On Fire TV](#on-fire-tv)) |
 | A server | A Jellyfin server, version 12.0 or newer, and an account on it |
 
+**Server versions:** Nixie for TV supports Jellyfin 12.0 and newer, the same as Glacier and the Jellyfin SDK it is
+built on; its tests and release checks run against Jellyfin 12.4. An older server shows as "not supported" in the
+server list, and **Connect anyway** still tries it, but some features may not work there and nothing is tested on one.
+
 Nixie for TV comes from this repository's [releases](https://github.com/mbustos27/nixie-tv/releases) only; it is not
 in an app store. Each release has three files:
 

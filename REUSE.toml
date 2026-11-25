@@ -75,6 +75,7 @@ path = [
     ".github/ISSUE_TEMPLATE/feature.yml",
     "PRIVACY.md",
     "docs/PUBLISH-CHECKLIST.md",
+    "docs/brand/README.md",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Nixie contributors"
@@ -100,3 +101,11 @@ path = [
 precedence = "override"
 SPDX-FileCopyrightText = ["Glacier contributors", "2026 Nixie contributors"]
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Nixie: the brand art (docs/brand/README.md), Nixie's own drawing with the NIXIE letters as Monoton's outlines.
+# Monoton is by Vernon Adams under the SIL Open Font License 1.1; the font itself is not in this repository.
+[[annotations]]
+path = ["docs/brand/*.svg", "docs/brand/*.png"]
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Nixie contributors", "2011 Vernon Adams"]
+SPDX-License-Identifier = "GPL-3.0-or-later AND OFL-1.1"
