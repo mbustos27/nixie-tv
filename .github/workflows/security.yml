@@ -8,9 +8,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # Weekly, so new CodeQL queries also run over code that has not changed.
-    - cron: '17 4 * * 1'
+  # Nixie: no weekly schedule (the fork runs nothing by itself); CodeQL runs on pushes, pull requests and by hand.
   workflow_dispatch:
 
 concurrency:

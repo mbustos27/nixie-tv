@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Nixie's own strings, kept apart from Glacier's so upstream's strings.xml keeps merging. -->
+<resources>
+    <string name="nixie_settings_accent_theme">This theme has its own colours, so the accent does not show in it.</string>
+    <string name="nixie_based_on">Based on Glacier</string>
+    <string name="nixie_based_on_sub">Nixie for TV is based on Glacier by its authors, under the GPL-3.0</string>
+    <string name="nixie_settings_theme">Theme</string>
+    <string name="nixie_settings_theme_sub">How Nixie looks. The change is immediate, and Drive-in is the default.</string>
+    <string name="nixie_theme_drivein">Drive-in</string>
+    <string name="nixie_theme_cinematic">Cinematic</string>
+    <string name="nixie_theme_editorial">Editorial</string>
+    <string name="nixie_theme_glacier">Glacier (original)</string>
+    <!-- tv-gate-a: a saved server's menu in the server list (its card's Menu key or a long OK), and Remove's question. -->
+    <string name="nixie_server_menu_remove">Remove from this TV</string>
+    <string name="nixie_server_remove_title">Remove %1$s from this TV?</string>
+    <string name="nixie_server_remove_body">Its profiles here are signed out and forgotten. The accounts on the server stay, and the server can be added again.</string>
+    <string name="nixie_server_remove">Remove</string>
+    <string name="nixie_server_removed">%1$s removed from this TV</string>
+    <string name="nixie_server_removing">Removing %1$s …</string>
+    <string name="nixie_signin_server_gone">That server is no longer on this TV. Pick a server or add it again.</string>
+</resources>

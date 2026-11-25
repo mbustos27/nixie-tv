@@ -95,10 +95,17 @@ import io.github.glacier_jellyfin.androidtv.ui.Toaster
 import io.github.glacier_jellyfin.androidtv.update.DownloadingOverlay
 import io.github.glacier_jellyfin.androidtv.update.InstallingOverlay
 import io.github.glacier_jellyfin.androidtv.update.text
+import io.github.mbustos27.nixie.tv.NixieThemes
+import io.github.mbustos27.nixie.tv.data.StartLine
+import io.github.mbustos27.nixie.tv.diagnostics.NixieCrashLogQuestion
+import io.github.mbustos27.nixie.tv.play.PlayerReturn
+import io.github.mbustos27.nixie.tv.start.StartCheck
+import io.github.mbustos27.nixie.tv.start.StartFromSaved
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -129,6 +136,10 @@ class StartViewModel @Inject constructor(
     private val launches: HomeLaunches,
     private val diagnostics: Diagnostics,
     settingsSync: SettingsSync,
+    // Nixie (tv-home-start): the checks after a start from what is saved may send the app to sign-in; the timings.
+    nixieCheck: StartCheck,
+    private val nixieStartLine: StartLine,
+    private val nixieStart: StartFromSaved,
 ) : ViewModel() {
     /** Where "Fotos & Videos" was left, for the way back into it. */
     fun folderMemory(): FolderMemory = browseMemory.folders()
@@ -182,6 +193,14 @@ class StartViewModel @Inject constructor(
 
     private var crashServer: LogServer? = null
 
+    // Nixie (integration 1): after a crash, the question first (when the app closed); nothing is served before Yes.
+    private val _crashAsk = MutableStateFlow<Long?>(null)
+
+    /** After a crash, the question whether to offer the log on the network, with when the app closed (epoch ms). */
+    val crashAsk = _crashAsk.asStateFlow()
+
+    private var crashSharing: Job? = null
+
     /** Shown once after a crash, when the log could not be offered on the network. */
     private val _crashNotice = Channel<Unit>(Channel.CONFLATED)
     val crashNotice: Flow<Unit> = _crashNotice.receiveAsFlow()
@@ -191,16 +210,26 @@ class StartViewModel @Inject constructor(
         whatsNew.start()
         settingsSync.start()
         viewModelScope.launch {
+            val began = nixieStartLine.now() // Nixie (tv-home-start)
             offerCrashLog()
             val server = accounts.current().startServerId()
-            _start.value = launches.pending?.let { ProfilesRoute(it.serverId, appStart = true, userId = it.userId) }
+            // Nixie (tv-home-start): the start profile opens from what is saved, and Home is the first screen.
+            val saved = (launches.pending?.serverId ?: server)?.let { id ->
+                HomeRoute.takeIf { nixieStart.open(id, launches.pending?.userId) }
+            }
+            val first = launches.pending?.let { ProfilesRoute(it.serverId, appStart = true, userId = it.userId) }
                 ?: server?.let { ProfilesRoute(it, appStart = true) }
                 ?: ServerListRoute
+            _start.value = saved ?: first // Nixie (tv-home-start)
+            nixieStartLine.step("Start: first screen chosen", nixieStartLine.now() - began) // Nixie (tv-home-start)
         }
+        viewModelScope.launch { nixieCheck.redirects.collect { _relaunch.trySend(it) } } // Nixie (tv-home-start)
     }
 
     /** A title picked on the home screen while the app runs: Home opens it, through the profile picker for another profile. */
     fun open(launch: HomeLaunch) {
+        // Nixie (TV-S12): a card for the title the player screen holds: the screen brings it back, opened once.
+        if (PlayerReturn.app.keeps(launch, sessions.session.value)) return
         launches.set(launch)
         val session = sessions.session.value
         val same = session != null && session.server.id == launch.serverId && session.user.userId == launch.userId
@@ -224,9 +253,32 @@ class StartViewModel @Inject constructor(
         crashServer?.close()
     }
 
-    /** After a crash, the log for a GitHub issue; without a network, a notice pointing to Settings › System. */
+    /** Nixie (integration 1): the crash question's answer; Yes offers the log on the local network, No nothing. */
+    fun answerCrashLog(yes: Boolean) {
+        val crashedAt = _crashAsk.value ?: return
+        // A Yes is being answered: the page stays until the log is offered.
+        if (crashSharing?.isActive == true) return
+        if (!yes) {
+            _crashAsk.value = null
+            return
+        }
+        crashSharing = viewModelScope.launch {
+            try {
+                shareCrashLog(crashedAt)
+            } finally {
+                _crashAsk.value = null
+            }
+        }
+    }
+
+    /** After a crash, the question first (Nixie, integration 1): [answerCrashLog] offers the log. */
     private suspend fun offerCrashLog() {
         val crashedAt = withContext(Dispatchers.IO) { if (Log.takeCrashNotice()) Log.lastCrash() else null } ?: return
+        _crashAsk.value = crashedAt
+    }
+
+    /** After a crash, the log for a bug report; without a network, a notice pointing to Settings › System. */
+    private suspend fun shareCrashLog(crashedAt: Long) {
         val server = try {
             diagnostics.shareOnNetwork()
         } catch (e: CancellationException) {
@@ -261,12 +313,15 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartLine.mark("Start: the activity begins") // Nixie (tv-home-start): the cold start's split
         // After Android ended the process in the background, the saved screens would open without a signed-in profile.
         // The app starts over instead, through the profile screen like on a normal launch.
         super.onCreate(savedInstanceState.takeIf { processAlive })
         processAlive = true
         // Before the start screen is chosen; a recreated activity has already handled it.
         if (savedInstanceState == null) HomeLaunch.from(intent)?.let(launches::set)
+        // Nixie: debug builds switch themes with --es nixie.theme <id>.
+        if (savedInstanceState == null) NixieThemes.fromIntent(this, intent)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 startViewModel.uiLanguage.filterNotNull().collect { language ->
@@ -378,8 +433,9 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val start by startViewModel.start.collectAsStateWithLifecycle()
                         val crashShare by startViewModel.crashShare.collectAsStateWithLifecycle()
+                        val crashAsk by startViewModel.crashAsk.collectAsStateWithLifecycle() // Nixie (integration 1)
                         // The first screen waits for the crash page, so it cannot take the focus from it.
-                        if (crashShare == null) {
+                        if (crashShare == null && crashAsk == null) { // Nixie (integration 1): or the question
                             start?.let {
                                 val navController = rememberNavController()
                                 GlacierNavHost(
@@ -402,6 +458,10 @@ class MainActivity : ComponentActivity() {
                         }
                         UpdateLayer(startViewModel.updates, toaster)
                         crashShare?.let { LogShareScreen(it, onClose = startViewModel::closeCrashShare) }
+                        // Nixie (integration 1): after a crash, asked before the log goes on the network.
+                        crashAsk?.takeIf { crashShare == null }?.let {
+                            NixieCrashLogQuestion(it, onAnswer = startViewModel::answerCrashLog)
+                        }
                         CrashNotice(startViewModel.crashNotice, toaster)
                         ToastHost(toaster)
                         NowPlayingSaver(saverOn, nowPlaying, startViewModel.music.state, startViewModel.music.progress)
@@ -409,6 +469,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Nixie (tv-home-start): the cold start's split, up to the first frame drawn.
+        StartLine.mark("Start: the activity's content set")
+        androidx.core.view.OneShotPreDrawListener.add(window.decorView) { StartLine.mark("Start: the first frame") }
     }
 
     override fun onResume() {
@@ -419,6 +482,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         HomeLaunch.from(intent)?.let(startViewModel::open)
+        // Nixie: debug builds switch themes with --es nixie.theme <id>.
+        NixieThemes.fromIntent(this, intent)
         // adb shell am start -n <package>/...MainActivity -a io.github.glacier_jellyfin.androidtv.PLAY_TITLE --es item <id> --el startms <ms>
         if (BuildConfig.DEBUG && intent.action == PLAY_ACTION) {
             intent.getStringExtra("item")?.let { startViewModel.play(it, intent.getLongExtra("startms", 0)) }

@@ -41,10 +41,10 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierShapes
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillButton
-import io.github.glacier_jellyfin.androidtv.diagnostics.ISSUES_URL
 import io.github.glacier_jellyfin.androidtv.diagnostics.LogShare
 import io.github.glacier_jellyfin.androidtv.diagnostics.QrImage
 import io.github.glacier_jellyfin.androidtv.update.DialogMark
+import io.github.mbustos27.nixie.tv.diagnostics.NixieLogAsk
 
 /**
  * Playback failed for good: the player's own recoveries are used up. A raised card over the
@@ -56,6 +56,7 @@ internal fun PlaybackFailureCard(
     state: PlayerUiState,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    onLogAnswer: (Boolean) -> Unit = {},
 ) {
     val retryFocus = remember { FocusRequester() }
     val shape = RoundedCornerShape(GlacierShapes.RadiusLg)
@@ -104,6 +105,16 @@ internal fun PlaybackFailureCard(
                     color = GlacierColors.Mist,
                 )
                 state.failureCode?.let { FailureCode(it) }
+                // Nixie (integration 1): asked before the log goes on the network; the focus goes back to Try again.
+                if (state.logAsk) {
+                    NixieLogAsk(
+                        stringResource(R.string.nixie_log_ask),
+                        onAnswer = { yes ->
+                            runCatching { retryFocus.requestFocus() }
+                            onLogAnswer(yes)
+                        },
+                    )
+                }
                 Box(Modifier.weight(1f, fill = false))
                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     PillButton(
@@ -173,7 +184,7 @@ private fun LogPanel(share: LogShare?) {
             QrImage(share.url, Modifier.size(240.dp).clip(RoundedCornerShape(GlacierShapes.RadiusMd)))
             Text(share.url, style = GlacierText.mono(16), color = GlacierColors.Ice, textAlign = TextAlign.Center)
             Text(
-                stringResource(R.string.player_error_log_body, ISSUES_URL),
+                stringResource(R.string.player_error_log_body), // Nixie: no tracker, the user shares the log
                 style = GlacierText.body(17),
                 color = GlacierColors.Mist,
                 textAlign = TextAlign.Center,

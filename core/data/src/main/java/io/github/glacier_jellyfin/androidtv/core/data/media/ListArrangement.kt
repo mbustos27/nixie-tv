@@ -78,6 +78,8 @@ object ListArrangement {
      * Puts [entries] (in any order) in the order of [query]. By title they go by name, turned round
      * for Z to A. Otherwise they go group by group (turned round for descending, the titles without
      * a value last) and by name inside a group, songs of an album by disc and track.
+     * Nixie (TV-S1): sorted by a value going up (oldest, lowest, shortest first), the titles without one come first, as
+     * Jellyfin has them: those lists page straight from the server's order (NixieLibraryPaging).
      */
     fun arrange(entries: List<IndexEntry>, query: LibraryQuery): ArrangedList {
         val keys = HashMap<UUID, String>(entries.size * 2)
@@ -93,13 +95,15 @@ object ListArrangement {
         val groupOf = HashMap<UUID, ListGroup>(entries.size * 2)
         entries.forEach { groupOf[it.id] = group(it, query.sort) }
         val nameKeys = HashMap<ListGroup, String>()
+        val unknownFirst = !query.orderDescending && query.sort in ValueSorts // Nixie (TV-S1)
         val byGroup = Comparator<ListGroup> { a, b ->
             when {
                 a == b -> 0
 
-                a == ListGroup.Unknown -> 1
+                // Nixie (TV-S1): first or last, see unknownFirst.
+                a == ListGroup.Unknown -> if (unknownFirst) -1 else 1
 
-                b == ListGroup.Unknown -> -1
+                b == ListGroup.Unknown -> if (unknownFirst) 1 else -1
 
                 else -> {
                     val order = when {
@@ -138,6 +142,9 @@ object ListArrangement {
         }
         return ArrangedList(sorted, groups, letters)
     }
+
+    /** Nixie (TV-S1): the sorts by a value (not by a name), whose titles without one come first going up. */
+    private val ValueSorts = setOf(LibrarySort.DateAdded, LibrarySort.Year, LibrarySort.Rating, LibrarySort.Runtime)
 
     /** The group [entry] falls in when sorted by [sort]. */
     fun group(entry: IndexEntry, sort: LibrarySort): ListGroup = when (sort) {

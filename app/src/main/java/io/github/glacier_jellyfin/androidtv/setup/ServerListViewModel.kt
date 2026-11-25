@@ -10,7 +10,9 @@ import io.github.glacier_jellyfin.androidtv.core.data.profilesFor
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.DiscoveredServer
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.ServerFinder
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.ServerInfo
+import io.github.glacier_jellyfin.androidtv.navigation.ServerListRoute
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.data.ServerRemoval
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -43,6 +45,15 @@ data class ServerListState(
     val connecting: String? = null,
     /** Server older than 12.0 waiting for "connect anyway". */
     val confirmUnsupported: ServerInfo? = null,
+    // Nixie (tv-gate-a): a saved server's menu (its card's Menu key or a long OK), and Remove's question.
+    val menuFor: ServerEntry? = null,
+    val removeAsked: ServerEntry? = null,
+    /** Bumped when a removal took a card away: the screen moves the focus only when it was on that card. */
+    val refocus: Int = 0,
+    /** The server whose card the last removal took away. */
+    val removed: String? = null,
+    // Nixie (tv-fix-a): the server being removed; "Removing …" shows meanwhile and Menu is ignored.
+    val removing: ServerEntry? = null,
 )
 
 @HiltViewModel
@@ -51,6 +62,8 @@ class ServerListViewModel @Inject constructor(
     private val finder: ServerFinder,
     private val connector: ServerConnector,
     private val reachability: ServerReachability,
+    // Nixie (tv-gate-a): removing a saved server through its menu.
+    private val removal: ServerRemoval,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ServerListState())
@@ -160,6 +173,52 @@ class ServerListViewModel @Inject constructor(
         connectJob?.cancel()
         connectJob = null
         _state.update { it.copy(connecting = null) }
+    }
+
+    // Nixie (tv-gate-a): a saved server's menu. Found servers have none; nothing is saved of them to remove.
+
+    /** The Menu key or a long OK on a saved server's card. */
+    fun openMenu(entry: ServerEntry) {
+        if (_state.value.removing != null || removal.removing.value.isNotEmpty()) return
+        if (_state.value.saved.none { it.server.id == entry.server.id }) return
+        _state.update { it.copy(menuFor = entry) }
+    }
+
+    /** Back on the menu: nothing done. */
+    fun closeMenu() = _state.update { it.copy(menuFor = null) }
+
+    /** Remove in the menu: asks once before anything goes. */
+    fun askRemove() = _state.update { it.copy(removeAsked = it.menuFor, menuFor = null) }
+
+    /** Cancel or Back on the question: nothing done. */
+    fun dismissRemove() = _state.update { it.copy(removeAsked = null) }
+
+    /**
+     * Remove confirmed: "Removing …" at once; the server leaves this TV first and its profiles are signed out on the
+     * server after (see [ServerRemoval]), in a scope of its own, so Back meanwhile cannot leave it half-removed. The
+     * screen learns of the end ([ServerListState.removed]) to send Back past the removed server's pages.
+     */
+    fun remove() {
+        val entry = _state.value.removeAsked ?: return
+        if (_state.value.removing != null) return
+        _state.update { it.copy(removeAsked = null, removing = entry) }
+        val done = removal.start(entry.server.id)
+        viewModelScope.launch {
+            val removed = runCatching { done.await() }.getOrDefault(false)
+            _state.update { state ->
+                state.copy(
+                    saved = state.saved.filterNot { it.server.id == entry.server.id },
+                    refocus = state.refocus + 1,
+                    removed = entry.server.id,
+                    removing = null,
+                )
+            }
+            if (removed) {
+                _events.send(UiEvent.Toast(R.string.nixie_server_removed, listOf(entry.server.name)))
+                // Its "Who's watching?" and sign-in pages may be under this list: Back must not lead to them.
+                _events.send(UiEvent.Navigate(ServerListRoute, nixieDropServer = entry.server.id))
+            }
+        }
     }
 
     /** Public users and the profiles set up here, each counted once; only the local ones when the server did not list its users. */

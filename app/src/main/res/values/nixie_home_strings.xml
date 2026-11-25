@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Nixie's home stream: Home, Continue Watching and sign-in. Kept apart from Glacier's strings and Nixie's others. -->
+<resources>
+    <string name="nixie_home_up_next">Up next</string>
+    <string name="nixie_cw_remove_title">Remove from Continue watching?</string>
+    <string name="nixie_cw_remove">Remove</string>
+    <string name="nixie_cw_remove_body">%1$s leaves the row. Its resume point goes too, on every device.</string>
+    <string name="nixie_cw_removed">Removed</string>
+    <string name="nixie_cw_undo">Select to undo</string>
+    <string name="nixie_cw_not_removed">The server didn\'t take the removal, so it\'s still there</string>
+    <string name="nixie_cw_changed_since">It was played since, so it stays as the server has it</string>
+    <string name="nixie_cw_not_put_back">The server didn\'t take the undo</string>
+    <string name="nixie_settings_hide_stale">Hide what you haven\'t played for</string>
+    <string name="nixie_settings_hide_stale_sub">Keeps Continue watching tidy. Only on this TV: the server keeps them.</string>
+    <string name="nixie_settings_never">Never</string>
+    <string name="nixie_settings_days">%1$d days</string>
+    <string name="nixie_settings_rewatching">Shows you\'re watching again</string>
+    <string name="nixie_settings_rewatching_sub">Up next also lists the next episode of a show you started over</string>
+    <string name="nixie_hero">Hero</string>
+    <string name="nixie_hero_sub">New titles you haven\'t watched, then Up next. Never what you\'re in the middle of: that has its own row.</string>
+    <string name="nixie_hero_off">Off: Home starts with its rows</string>
+    <string name="nixie_marked_watched_undo">Marked watched. Select it again within 10 seconds to undo.</string>
+    <string name="nixie_season_marked_watched_undo">Season marked watched. Choose it again within 10 seconds to undo.</string>
+    <string name="nixie_watched_undone">Back as it was</string>
+    <string name="nixie_watched_undone_partly">Back as it was, apart from episodes played since</string>
+    <string name="nixie_watched_not_undone">The server didn\'t take the undo, so it stays watched</string>
+    <string name="nixie_top_bar">Top bar</string>
+    <string name="nixie_top_bar_starred">In the top bar</string>
+    <string name="nixie_top_bar_full">Up to 3: take a star off another first</string>
+    <string name="nixie_top_bar_star">Star it to put it in the top bar</string>
+    <string name="nixie_home_cw_empty">Nothing started yet.</string>
+    <string name="nixie_home_up_next_empty">No next episodes yet.</string>
+    <string name="nixie_home_empty_title">Nothing to continue yet</string>
+    <string name="nixie_home_empty_body">Open a library from the top bar to find something to watch. What you start shows up here.</string>
+    <string name="nixie_collections_none">The server lists no collections.</string>
+    <string name="nixie_settings_nav_collections_sub">Every collection on the server, A to Z</string>
+    <string name="nixie_nav_libraries">Libraries</string>
+    <string name="nixie_settings_nav_libraries_sub">Every library on the server, one card each</string>
+    <string name="nixie_libraries_none">The server lists no libraries.</string>
+    <plurals name="nixie_libraries_count">
+        <item quantity="one">%d library</item>
+        <item quantity="other">%d libraries</item>
+    </plurals>
+    <!-- tv-1.0-r1: the Collections page's order button, the list's direction in words. -->
+    <string name="nixie_order_a_to_z">A to Z</string>
+    <string name="nixie_order_z_to_a">Z to A</string>
+    <string name="nixie_order_newest">Newest first</string>
+    <string name="nixie_order_oldest">Oldest first</string>
+    <string name="nixie_order_highest">Highest rated first</string>
+    <string name="nixie_order_lowest">Lowest rated first</string>
+    <string name="nixie_order_longest">Longest first</string>
+    <string name="nixie_order_shortest">Shortest first</string>
+</resources>

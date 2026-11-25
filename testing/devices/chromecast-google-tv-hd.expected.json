@@ -1,0 +1,22 @@
+{
+  "schema": "nixie-device-answers/1",
+  "source": "expected",
+  "verified": false,
+  "about": "What the architecture plan expects of this box, from public reports. Every null is unknown until the box's own device-facts.json (Save device facts in a debug build) replaces this file.",
+  "device": {
+    "model": "Chromecast with Google TV (HD), 2022",
+    "chip": "Amlogic S805X2, 4x Cortex-A35, Mali-G31 MP2",
+    "notes": "1.5 GB: below Google TV's 2 GB requirement, still in the field. AV1 at 1080p reported (XDA)."
+  },
+  "abis": null,
+  "abis64": null,
+  "memory": {
+    "lowRamDevice": null,
+    "memoryClassMb": null,
+    "largeMemoryClassMb": null,
+    "totalMb": 1536
+  },
+  "display": null,
+  "audioDirect": null,
+  "decoders": null
+}

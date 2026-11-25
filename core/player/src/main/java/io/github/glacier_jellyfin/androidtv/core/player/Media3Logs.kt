@@ -35,9 +35,15 @@ object Media3Logs {
         })
     }
 
-    /** With detailed logging on, every player event (tracks, formats, buffering, dropped frames). */
+    /**
+     * With detailed logging on, every player event (tracks, formats, buffering, dropped frames). Nixie
+     * (tv-1.0-privacy): without the files' tags ([TagFreeEventLogger]).
+     */
     @OptIn(UnstableApi::class)
     internal fun attach(player: ExoPlayer) {
-        if (Log.verbose) player.addAnalyticsListener(EventLogger())
+        if (Log.verbose) player.addAnalyticsListener(eventLogger())
     }
+
+    /** The event log [attach] adds. */
+    internal fun eventLogger(): EventLogger = TagFreeEventLogger()
 }

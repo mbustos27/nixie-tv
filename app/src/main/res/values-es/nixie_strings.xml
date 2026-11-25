@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_settings_accent_theme">Este tema tiene sus propios colores, así que el color de acento no se ve en él.</string>
+    <string name="nixie_based_on">Basado en Glacier</string>
+    <string name="nixie_based_on_sub">Nixie for TV se basa en Glacier de sus autores, bajo la GPL-3.0</string>
+    <string name="nixie_settings_theme">Tema</string>
+    <string name="nixie_settings_theme_sub">El aspecto de Nixie. El cambio es inmediato; Drive-in es el predeterminado.</string>
+    <string name="nixie_theme_drivein">Drive-in</string>
+    <string name="nixie_theme_cinematic">Cinematic</string>
+    <string name="nixie_theme_editorial">Editorial</string>
+    <string name="nixie_theme_glacier">Glacier (original)</string>
+    <string name="nixie_server_menu_remove">Quitar de esta TV</string>
+    <string name="nixie_server_remove_title">¿Quitar %1$s de esta TV?</string>
+    <string name="nixie_server_remove_body">Sus perfiles aquí se cierran y se olvidan. Las cuentas del servidor siguen, y el servidor se puede volver a añadir.</string>
+    <string name="nixie_server_remove">Quitar</string>
+    <string name="nixie_server_removed">%1$s quitado de esta TV</string>
+    <string name="nixie_server_removing">Quitando %1$s …</string>
+    <string name="nixie_signin_server_gone">Ese servidor ya no está en esta TV. Elige un servidor o vuelve a añadirlo.</string>
+</resources>

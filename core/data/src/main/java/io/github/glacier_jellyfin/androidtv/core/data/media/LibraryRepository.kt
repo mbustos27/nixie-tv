@@ -3,6 +3,10 @@ package io.github.glacier_jellyfin.androidtv.core.data.media
 import io.github.glacier_jellyfin.androidtv.core.data.Session
 import io.github.glacier_jellyfin.androidtv.core.data.SessionManager
 import io.github.glacier_jellyfin.androidtv.core.log.Log
+import io.github.mbustos27.nixie.tv.data.library.NixieLibraryPaging
+import io.github.mbustos27.nixie.tv.data.library.PageTiming
+import io.github.mbustos27.nixie.tv.data.library.ServerSort
+import io.github.mbustos27.nixie.tv.jellyfin.NixieRequestClock
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -57,22 +61,22 @@ data class LibraryQuery(
     val favoritesOnly: Boolean = false,
     /** The "Unwatched" toggle of movies and shows. */
     val unwatchedOnly: Boolean = false,
+    // Nixie (tv-home-two-rows): the top bar's Collections page: every collection on the server, its own sort and toggles.
+    val nixieAllCollections: Boolean = false,
 ) {
-    /**
-     * Movies grouped into collections, and only the unwatched ones. Jellyfin does
-     * not group once a played filter is in the query, so the app does it.
-     */
-    val unwatchedGrouped: Boolean
-        get() = unwatchedOnly && groupsCollections
-
     /** The collections tab of shows lists only the collections that hold a show. */
     val showCollections: Boolean
         get() = scope == LibraryScope.Collections && kind == LibraryKind.Shows
 
-    /** The movies tab shows collections in place of their movies. Filtered, the titles themselves count, except for unwatched. */
+    /**
+     * The movies tab shows collections in place of their movies. Filtered, the titles themselves count: a collection would
+     * hide which of its movies match. Nixie (TV-S1): unwatched too (Glacier grouped those itself from the whole library,
+     * half a minute on a big server: Jellyfin does not group once a played filter is in the query; its web client shows
+     * the unwatched titles themselves as well).
+     */
     val groupsCollections: Boolean
         get() = scope == LibraryScope.All && kind == LibraryKind.Movies && groupCollections && genreId == null &&
-            !favoritesOnly
+            !favoritesOnly && !unwatchedOnly
 
     /** Genres are listed as they are: the toggles narrow titles, not genres. */
     val filterable: Boolean get() = scope != LibraryScope.Genres
@@ -122,7 +126,10 @@ data class LibraryQuery(
      * Where the chosen sort is kept: one per kind, and one per tab for music, whose tabs
      * sort by different things. Albums keep the plain kind key they had before tabs had their own.
      */
-    val sortKey: String get() = if (kind == LibraryKind.Music &&
+    val sortKey: String get() = if (nixieAllCollections) {
+        // Nixie (tv-home-two-rows): the Collections page keeps its own (A to Z until changed), not the movies'.
+        NIXIE_COLLECTIONS_KEY
+    } else if (kind == LibraryKind.Music &&
         scope != LibraryScope.Albums
     ) {
         "${kind.name}.${scope.name}"
@@ -141,6 +148,19 @@ data class LibraryQuery(
         sort == LibrarySort.Album
 
     companion object {
+        /** Nixie (tv-home-two-rows): where the Collections page keeps its sort and toggles. */
+        const val NIXIE_COLLECTIONS_KEY = "Collections"
+
+        /**
+         * Nixie (tv-home-two-rows): the top bar's Collections page, every collection on the server (box sets) A to Z,
+         * paged from the server's order as a movie library's Collections chip is (NixieLibraryPaging).
+         */
+        fun nixieCollections() = LibraryQuery(
+            kind = LibraryKind.Movies,
+            scope = LibraryScope.Collections,
+            nixieAllCollections = true,
+        )
+
         fun defaultScope(kind: LibraryKind) = if (kind == LibraryKind.Music) LibraryScope.Albums else LibraryScope.All
 
         /** Music has a tab for the music videos when the server has a library of them ([musicVideos]). */
@@ -170,7 +190,15 @@ data class LibraryQuery(
     }
 }
 
-data class LibraryPage(val items: List<MediaItem>, val total: Int)
+data class LibraryPage(
+    val items: List<MediaItem>,
+    /** Nixie (TV-S1): null while unknown: a list from the server is counted apart (LibraryRepository.serverPosition). */
+    val total: Int?,
+    /** Nixie (TV-S1): straight from the server in its own order, while the index is not in memory (NixieLibraryPaging). */
+    val serverOrder: Boolean = false,
+    /** Nixie (TV-S1): how long its request and its parsing took, for the detailed log; null when not timed. */
+    val timing: PageTiming? = null,
+)
 
 /** How far the whole list of [query] has come while the grid waits for it: [loaded] of [total] titles. */
 data class LoadProgress(
@@ -205,13 +233,32 @@ class LibraryRepository @Inject constructor(
     /** The whole list the grid waits for, while it takes more than one request; null otherwise. */
     val progress: StateFlow<LoadProgress?> = _progress.asStateFlow()
 
-    /** Titles [start] to [start] + [limit] of [query], each with its group when the list is grouped. */
+    /**
+     * Titles [start] to [start] + [limit] of [query], each with its group when the list is grouped.
+     * Nixie (TV-S1): [serverOrder] continues a list that came from the server in its own order ([firstPage]); [total]
+     * is its size, asked again when null. Nixie (TV-S13): [fromLetter], titles counted from that letter's first one in
+     * the server's order (an A–Z jump's first row in one request: the server filters by sort name,
+     * [NixieLibraryPaging.letterStart], so the page needs no place in the list first), uncounted.
+     */
     suspend fun page(
         query: LibraryQuery,
         start: Int,
         limit: Int,
+        serverOrder: Boolean = false,
+        total: Int? = null,
+        // Nixie (TV-S1): a page of a list in the server's order starts a few titles back, unless it fills in before.
+        overlap: Boolean = true,
+        fromLetter: Char? = null, // Nixie (TV-S13)
     ): LibraryPage = withContext(Dispatchers.IO) {
         val session = requireSession()
+        // Nixie (TV-S13): an A–Z jump's page, from its letter.
+        fromLetter?.let { letter ->
+            val bounds = NixieLibraryPaging.letterStart(letter, query.orderDescending)
+            val from = checkNotNull(bounds) { "The list starts with $letter" }
+            return@withContext serverPage(session, query, start, limit, known = null, overlap = false, letter = from)
+        }
+        // Nixie (TV-S1): the next pages of a list that came from the server in its own order (firstPage).
+        if (serverOrder) return@withContext serverPage(session, query, start, limit, total, overlap)
         val mapper = MediaMapper(session.api)
         // The first page is a fresh look: something may have changed meanwhile.
         val listing = listing(session, query, fresh = start == 0)
@@ -236,15 +283,33 @@ class LibraryRepository @Inject constructor(
         if (entries.isEmpty()) 1f else entries.count { it.artist != null } / entries.size.toFloat()
     }
 
-    suspend fun availableLetters(query: LibraryQuery): Set<Char> = withContext(Dispatchers.IO) {
-        val list = listing(requireSession(), query).list
+    /** Nixie (TV-S1): fetched in the [background] (big pages, uncounted) when nobody waits for it, else as a wait. */
+    suspend fun availableLetters(query: LibraryQuery, background: Boolean = false): Set<Char> =
+        withContext(Dispatchers.IO) {
+            val list = listing(requireSession(), query, waited = !background).list
+            (0 until list.size).mapNotNullTo(mutableSetOf()) { list.letterAt(it) }
+        }
+
+    /**
+     * Nixie (TV-S1): the letters of [query]'s A–Z rail when its index is in memory or saved on the device; null when
+     * only the server has it. Opening a list asks the server for no index (a big library takes it some 26 requests).
+     */
+    suspend fun knownLetters(query: LibraryQuery): Set<Char>? = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        val key = indexKey(session, query)
+        if (!query.listedWhole && cachedIndex(key) == null && store.savedAt(key) == null) return@withContext null
+        val list = listing(session, query).list
         (0 until list.size).mapNotNullTo(mutableSetOf()) { list.letterAt(it) }
     }
 
-    /** Position of the first title filed under [letter] in the current order. */
+    /**
+     * Position of the first title filed under [letter] in the current order. Nixie (TV-S1): with no title under it (the
+     * rail offers every letter while its index is not known), the first title after it, else the last one.
+     */
     suspend fun indexOfLetter(query: LibraryQuery, letter: Char): Int = withContext(Dispatchers.IO) {
         val list = listing(requireSession(), query).list
-        (0 until list.size).firstOrNull { list.letterAt(it) == letter } ?: 0
+        (0 until list.size).firstOrNull { list.letterAt(it) == letter }
+            ?: NixieLibraryPaging.nearestLetter(letter, query.orderDescending, list.size) { list.letterAt(it) }
     }
 
     /** Position of the title [id] in the current order; null when the list does not hold it. */
@@ -266,12 +331,132 @@ class LibraryRepository @Inject constructor(
         listing(requireSession(), query).list.rowStart(index, columns)
     }
 
+    // Nixie (TV-S1) ------------------------------------------------------------------------------------------------
+
+    /**
+     * A list's first [limit] titles as the grid opens it: from the index as [page] has them, or, while the index is not
+     * in memory and the server's order will do ([NixieLibraryPaging]), straight from the server in that order
+     * ([LibraryPage.serverOrder]); the index then comes (from the device, or gently from the server) when the A–Z rail
+     * or a jump asks for it.
+     */
+    suspend fun firstPage(query: LibraryQuery, limit: Int): LibraryPage = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        if (NixieLibraryPaging.pagesOnServer(query) && !indexReady(session, query)) {
+            // Uncounted: the count of a big library is its own request, after the first row (DESIGN-RULES 3).
+            serverPage(session, query, 0, limit, known = null)
+        } else {
+            page(query, 0, limit)
+        }
+    }
+
+    /** Whether [query]'s index is in memory (and a fresh look would not fetch it again): its order is the app's. */
+    suspend fun indexReady(query: LibraryQuery): Boolean = withContext(Dispatchers.IO) {
+        indexReady(requireSession(), query)
+    }
+
+    /**
+     * As [index] with `fresh` decides, but only from memory: a saved index takes a big library seconds to read and put in
+     * order (6 s for 25,000 films on the emulator), so the first page does not wait for it either.
+     */
+    private suspend fun indexReady(session: Session, query: LibraryQuery): Boolean {
+        if (query.listedWhole) return true
+        val key = indexKey(session, query)
+        val cached = cachedIndex(key) ?: return false
+        val filtered = query.favoritesOnly || query.unwatchedOnly || query.scope == LibraryScope.Playlists
+        return !filtered || System.currentTimeMillis() - cached.at < WHOLE_FRESH_MS
+    }
+
+    /**
+     * Titles [start] to [start] + [limit] of [query] in the server's order ([NixieLibraryPaging.serverSort]), with only
+     * what a card needs, uncounted: [known] is the list's size once counted apart ([serverPosition]), else the size is
+     * null until a page comes back short. A later page starts [NixieLibraryPaging.OVERLAP] titles back, so the server's
+     * list moving meanwhile skips none; the titles it repeats are left out when appended ([NixieLibraryPaging.appended]).
+     * No [overlap] for a page that fills in before what is loaded, starts the list anew or loads it again in place.
+     */
+    private suspend fun serverPage(
+        session: Session,
+        query: LibraryQuery,
+        start: Int,
+        limit: Int,
+        known: Int?,
+        overlap: Boolean = true,
+        // Nixie (TV-S13): an A–Z jump's page, from its letter; [start] counted from the letter's first title.
+        letter: NixieLibraryPaging.LetterStart? = null,
+    ): LibraryPage {
+        val sort = checkNotNull(NixieLibraryPaging.serverSort(query)) { "No server order for $query" }
+        val from = if (start == 0 || !overlap) start else (start - NixieLibraryPaging.OVERLAP).coerceAtLeast(0)
+        val asked = limit + (start - from)
+        // Nixie (TV-S1): the request and the parsing timed apart, for the detailed log (DESIGN-RULES 10).
+        val clock = NixieRequestClock()
+        val sent = clock.now()
+        val result = withContext(clock) {
+            fetch(
+                session,
+                query,
+                start = from,
+                limit = asked,
+                serverSort = sort,
+                withTotal = false, // Nixie (TV-S1)
+                nameLessThan = letter?.below, // Nixie (TV-S13): a jump's page, by its letter
+                nameFrom = letter?.from,
+            )
+        }
+        val mapper = MediaMapper(session.api)
+        val items = result.items.map { dto ->
+            val item = mapper.item(dto)
+            if (query.grouped) item.copy(group = ListArrangement.group(entryOf(dto, query), query.sort)) else item
+        }
+        val total = when {
+            // Nixie (TV-S13): where the letter's titles sit in the list is asked apart (serverPosition).
+            letter != null -> null
+
+            known != null -> NixieLibraryPaging.totalAfter(known, from, asked, items.size)
+
+            // The list ends here.
+            items.size < asked -> from + items.size
+
+            else -> null
+        }
+        val marked = ageFilter.mark(items)
+        return LibraryPage(marked, total, serverOrder = true, PageTiming.of(sent, clock.receivedAt, clock.now()))
+    }
+
+    /**
+     * Nixie (TV-S1): a place in [query]'s list in the server's order, asked apart from its pages, with the same filters
+     * and limit 0 (counting a big library takes the server a while: never with the first page, DESIGN-RULES 3).
+     * With no [letter], the end of the list: how many titles it holds. With a [letter], where an A–Z jump to it lands,
+     * without the index: the titles whose sort name comes before it (`NameLessThan`); Z to A counts back from the end,
+     * [total] when known. A letter with no titles lands on the next one. One request; two for Z to A uncounted.
+     */
+    suspend fun serverPosition(
+        query: LibraryQuery,
+        letter: Char? = null,
+        total: Int? = null,
+    ): Int = withContext(Dispatchers.IO) {
+        val session = requireSession()
+
+        suspend fun titlesBefore(name: String?) = fetch(
+            session,
+            query,
+            start = 0,
+            limit = 0,
+            light = true,
+            withTotal = true,
+            nameLessThan = name,
+        ).totalRecordCount
+
+        if (letter == null) return@withContext titlesBefore(null)
+        val bounds = NixieLibraryPaging.letterBounds(letter, query.orderDescending)
+        val before = bounds.below?.let { titlesBefore(it) } ?: 0
+        if (bounds.fromTheEnd) ((total ?: titlesBefore(null)) - before).coerceAtLeast(0) else before
+    }
+
     /**
      * Fetched whole, with everything a card needs ([wholeList]). Artists and genres come
      * from their own endpoints, which count albums and titles. Fetched by id they would not.
      */
     private val LibraryQuery.listedWhole: Boolean
-        get() = unwatchedGrouped || scope == LibraryScope.Artists || scope == LibraryScope.Genres
+        get() = scope == LibraryScope.Artists || scope == LibraryScope.Genres // Nixie (TV-S1): no unwatched grouping
 
     /** What a title is sorted and filed under (see [NameOrder.title]). A song's sort name starts with its disc and track ("0001 - 0003 - Title"). */
     private fun nameOf(dto: BaseItemDto, query: LibraryQuery): String =
@@ -324,9 +509,11 @@ class LibraryRepository @Inject constructor(
         session: Session,
         query: LibraryQuery,
         fresh: Boolean = false,
+        // Nixie (TV-S1): whether someone waits for it (small pages, counted) or not (the background index).
+        waited: Boolean = true,
     ): Listing {
         val whole = if (query.listedWhole) wholeList(session, query, fresh) else null
-        val entries = whole?.entries ?: index(session, query, fresh)
+        val entries = whole?.entries ?: index(session, query, fresh, waited) // Nixie (TV-S1): waited
         return listingLock.withLock {
             listingCache?.takeIf { it.query == query && it.source === entries }
                 ?: Listing(
@@ -344,8 +531,21 @@ class LibraryRepository @Inject constructor(
         val value: T,
     )
 
-    /** The index the grid pages through. */
-    private var indexCache: Cached<List<IndexEntry>>? = null
+    /**
+     * The indexes the grid pages through. Nixie (TV-S1): several, the last used kept, for the session: each library's
+     * index fetched once, not again whenever another library was opened in between (Glacier kept one).
+     */
+    private val indexCache = object : LinkedHashMap<String, Cached<List<IndexEntry>>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Cached<List<IndexEntry>>>) =
+            size > NixieLibraryPaging.INDEXES_KEPT
+    }
+
+    // Nixie (TV-S1): read without the index lock by indexReady and knownLetters.
+    private fun cachedIndex(key: String): Cached<List<IndexEntry>>? = synchronized(indexCache) { indexCache[key] }
+
+    private fun keepIndex(key: String, index: Cached<List<IndexEntry>>) = synchronized(indexCache) {
+        indexCache[key] = index
+    }
     private val indexLock = Mutex()
     private val refreshing = mutableSetOf<String>()
     private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -362,10 +562,12 @@ class LibraryRepository @Inject constructor(
         session: Session,
         query: LibraryQuery,
         fresh: Boolean = false,
+        // Nixie (TV-S1): decided per request (see listing).
+        waited: Boolean = true,
     ): List<IndexEntry> = indexLock.withLock {
         val key = indexKey(session, query)
         val now = System.currentTimeMillis()
-        val cached = indexCache?.takeIf { it.key == key }
+        val cached = cachedIndex(key) // Nixie (TV-S1): one of several
         when {
             cached != null && !fresh -> cached.value
 
@@ -374,7 +576,8 @@ class LibraryRepository @Inject constructor(
                 if (cached != null && now - cached.at < WHOLE_FRESH_MS) {
                     cached.value
                 } else {
-                    fetchIndex(session, query).also { indexCache = Cached(key, now, it) }
+                    // Nixie (TV-S1): small pages and counted when waited for, big pages in the background.
+                    fetchIndex(session, query, waitedFor = waited).also { keepIndex(key, Cached(key, now, it)) }
                 }
 
             else -> {
@@ -382,7 +585,7 @@ class LibraryRepository @Inject constructor(
                 val newest = if (savedAt != null && (cached == null || savedAt > cached.at)) store.read(key) else null
                 when {
                     newest != null -> {
-                        indexCache = Cached(key, newest.at, newest.entries)
+                        keepIndex(key, Cached(key, newest.at, newest.entries)) // Nixie (TV-S1)
                         if (now - newest.at > INDEX_REFRESH_MS) refreshInBackground(session, query, key)
                         newest.entries
                     }
@@ -392,8 +595,9 @@ class LibraryRepository @Inject constructor(
                         cached.value
                     }
 
-                    else -> fetchIndex(session, query).also {
-                        indexCache = Cached(key, now, it)
+                    // Nixie (TV-S1): small pages and counted when waited for, big pages in the background.
+                    else -> fetchIndex(session, query, waitedFor = waited).also {
+                        keepIndex(key, Cached(key, now, it)) // Nixie (TV-S1)
                         store.write(key, SavedIndex(now, it))
                     }
                 }
@@ -464,9 +668,6 @@ class LibraryRepository @Inject constructor(
     /**
      * The whole list of [query], kept for the next pages and the A–Z rail. [fresh] fetches
      * it again unless it was fetched a moment ago (the first page and the rail load together).
-     * The movies tab grouped into collections, without what was watched, is one: the server
-     * does not group once a played filter is in the query, so the app leaves out the movies
-     * watched and the collections whose movies were all watched (the server marks those played).
      */
     private suspend fun wholeList(
         session: Session,
@@ -478,8 +679,7 @@ class LibraryRepository @Inject constructor(
             val recent = System.currentTimeMillis() - cached.at < WHOLE_FRESH_MS
             if (cached.key == key && (!fresh || recent)) return@withLock cached.value
         }
-        var items = fetchAll(session, query, grouped = query.unwatchedGrouped) { it }.distinctBy { it.id }
-        if (query.unwatchedGrouped) items = items.filter { it.userData?.played != true }
+        val items = fetchAll(session, query) { it }.distinctBy { it.id } // Nixie (TV-S1): no unwatched grouping
         val whole = Whole(items.map { entryOf(it, query) }, items.associateBy { it.id })
         wholeCache = Cached(key, System.currentTimeMillis(), whole)
         whole
@@ -493,28 +693,34 @@ class LibraryRepository @Inject constructor(
         session: Session,
         query: LibraryQuery,
         light: Boolean = false,
-        grouped: Boolean = false,
         waitedFor: Boolean = true,
         convert: (List<BaseItemDto>) -> List<T>,
     ): List<T> {
-        val first = fetch(session, query, start = 0, limit = WHOLE_PAGE, light = light, grouped = grouped)
+        // Nixie (TV-S1): a list someone waits for comes in small pages, counted in [progress]; one nobody waits for
+        // (the background index) in big pages, two at once, so the server is asked less often and the pages the grid
+        // asks for meanwhile stay quick. Only the first page asks the server to count.
+        val pageSize = if (waitedFor) NixieLibraryPaging.WAITED_PAGE else NixieLibraryPaging.BACKGROUND_PAGE
+        val first = fetch(session, query, start = 0, limit = pageSize, light = light)
         val total = first.totalRecordCount.coerceAtMost(MAX_WHOLE)
-        val counted = waitedFor && total > WHOLE_PAGE
+        val counted = waitedFor && total > pageSize // Nixie (TV-S1): pageSize
         val loaded = AtomicInteger(first.items.size)
         if (counted) _progress.value = LoadProgress(query, loaded.get(), total)
-        val permits = Semaphore(WHOLE_PARALLEL)
+        val permits = Semaphore(
+            if (waitedFor) NixieLibraryPaging.WAITED_PARALLEL else NixieLibraryPaging.BACKGROUND_PARALLEL,
+        )
         try {
             val rest = coroutineScope {
-                (WHOLE_PAGE until total step WHOLE_PAGE).map { start ->
+                // Nixie (TV-S1): pageSize
+                (pageSize until total step pageSize).map { start ->
                     async {
                         permits.withPermit {
                             val page = fetch(
                                 session,
                                 query,
                                 start = start,
-                                limit = WHOLE_PAGE,
+                                limit = pageSize, // Nixie (TV-S1)
                                 light = light,
-                                grouped = grouped,
+                                withTotal = false, // Nixie (TV-S1): only the first page counts the list
                             ).items
                             if (counted) {
                                 val now = loaded.addAndGet(page.size).coerceAtMost(total)
@@ -611,15 +817,20 @@ class LibraryRepository @Inject constructor(
         limit: Int,
         /** Only what [index] needs: no images, user data or extra fields. */
         light: Boolean = false,
-        /** For [wholeList]: grouped into collections, without the played filter the server would not group with. */
-        grouped: Boolean = false,
+        /** Nixie (TV-S1): a page of a list shown in the server's order (NixieLibraryPaging), not the app's. */
+        serverSort: ServerSort = PagesApart,
+        /** Nixie (TV-S1): whether the server counts the list; only its first page needs that. */
+        withTotal: Boolean = true,
+        /** Nixie (TV-S1): only the titles whose sort name comes before it (an A–Z jump's place). */
+        nameLessThan: String? = null,
+        /** Nixie (TV-S13): only the titles whose sort name is this or comes after it (an A–Z jump's first page). */
+        nameFrom: String? = null,
     ): BaseItemDtoQueryResult {
         val userId = UUID.fromString(session.user.userId)
-        // The app puts the titles in order itself (ListArrangement). This only keeps the pages apart.
-        val sortBy = listOf(ItemSortBy.SORT_NAME, ItemSortBy.DATE_CREATED)
+        val sortBy = serverSort.by // Nixie (TV-S1): PagesApart, Glacier's own, unless in the server's order
         val favorite = true.takeIf { query.favoritesOnly }
         val ages = ageLimits(query)
-        val order = listOf(SortOrder.ASCENDING)
+        val order = serverSort.order // Nixie (TV-S1): as sortBy
         val only = if (query.showCollections) showCollectionIds(session) else emptyList()
         // Asked without ids, the server would list every collection.
         if (query.showCollections && only.isEmpty()) {
@@ -673,10 +884,10 @@ class LibraryRepository @Inject constructor(
                 genreIds = listOfNotNull(query.genreId),
                 maxOfficialRating = ages?.maxOfficialRating,
                 hasOfficialRating = ages?.hasOfficialRating,
-                filters = listOfNotNull(ItemFilter.IS_UNPLAYED.takeIf { query.unwatchedOnly && !grouped }),
+                filters = listOfNotNull(ItemFilter.IS_UNPLAYED.takeIf { query.unwatchedOnly }), // Nixie (TV-S1)
                 isFavorite = favorite,
                 // Filtered, the titles themselves count: a collection would hide which of its movies match.
-                collapseBoxSetItems = (grouped || (query.groupsCollections && !query.unwatchedOnly)).takeIf { it },
+                collapseBoxSetItems = query.groupsCollections.takeIf { it }, // Nixie (TV-S1): unwatched included
                 fields = if (light) {
                     listOf(
                         ItemFields.SORT_NAME,
@@ -691,12 +902,16 @@ class LibraryRepository @Inject constructor(
                     )
                 },
                 enableImages = !light,
+                // Nixie (TV-S1): a card shows one picture of each kind at most.
+                imageTypeLimit = 1.takeIf { serverSort !== PagesApart },
                 enableUserData = !light,
                 startIndex = start,
                 limit = limit,
                 sortBy = sortBy,
                 sortOrder = order,
-                enableTotalRecordCount = true,
+                enableTotalRecordCount = withTotal, // Nixie (TV-S1): only the first page counts the list
+                nameLessThan = nameLessThan, // Nixie (TV-S1): an A–Z jump's place
+                nameStartsWithOrGreater = nameFrom, // Nixie (TV-S13): an A–Z jump's first page
             ).content
         }
     }
@@ -724,21 +939,27 @@ class LibraryRepository @Inject constructor(
         }
 
     private companion object {
-        /** Titles per request when a whole list is fetched. */
-        const val WHOLE_PAGE = 2000
+        /**
+         * The app puts the titles in order itself (ListArrangement). This only keeps the pages apart.
+         * Nixie (TV-S1): the order [fetch] asks for unless a list is shown in the server's own.
+         */
+        val PagesApart = ServerSort(listOf(ItemSortBy.SORT_NAME, ItemSortBy.DATE_CREATED), listOf(SortOrder.ASCENDING))
 
-        /** Requests at once when a whole list is fetched. */
-        const val WHOLE_PARALLEL = 8
+        // Nixie (TV-S1): the page sizes and requests at once of a whole list are NixieLibraryPaging's (waited or not).
 
         /** The grid's first page and the A–Z rail ask for the whole list together: one fetch serves both. */
         const val WHOLE_FRESH_MS = 3_000L
 
-        /** An [index] older than this is fetched again in the background. The pages fetched with it are always fresh. */
-        const val INDEX_REFRESH_MS = 30 * 60_000L
+        /**
+         * An [index] older than this is fetched again in the background. The pages fetched with it are always fresh.
+         * Nixie (TV-S1): a day (Glacier: 30 minutes). Pages from the server show new titles anyway, and the server
+         * belongs to someone else: its whole library is not asked for again at nearly every open.
+         */
+        const val INDEX_REFRESH_MS = 24 * 60 * 60_000L
         const val TAG = "Library"
 
         /** Ids per request when a page is fetched by its ids. */
-        const val IDS_PER_REQUEST = 40
+        const val IDS_PER_REQUEST = NixieLibraryPaging.IDS_PER_REQUEST // Nixie (TV-S13): Glacier's 40
 
         /** How long the collections holding shows are trusted before they are looked up again. */
         const val SHOW_COLLECTIONS_FRESH_MS = 5 * 60_000L

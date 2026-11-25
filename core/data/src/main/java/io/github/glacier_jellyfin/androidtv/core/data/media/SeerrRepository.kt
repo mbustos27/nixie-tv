@@ -269,7 +269,8 @@ class SeerrRepository @Inject constructor(private val sessions: SessionManager) 
             val status = connection.responseCode
             if (status in 200..299) return@withContext SeerrRequestResult.Sent
             val answer = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            Log.w(TAG, "Seerr request for $type $tmdbId answered $status: ${answer.take(300)}")
+            // Nixie (tv-1.0-privacy): neither the TMDB id nor the answer's text, which may name the title.
+            Log.w(TAG, "Seerr request for a $type answered $status (${answer.length} characters)")
             requestFailure(status, answer)
         } finally {
             connection.disconnect()

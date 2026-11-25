@@ -4,7 +4,7 @@
 
     <!-- Setup: server -->
     <string name="setup_welcome">Welcome</string>
-    <string name="setup_intro">Connect this device to your Jellyfin server. Servers on the same network are found automatically.</string>
+    <string name="setup_intro">Connect this device to the Jellyfin server you use. Servers on the same network are found automatically.</string>
     <string name="setup_found_on_network">Found on network</string>
     <string name="setup_saved_servers">Saved servers</string>
     <string name="setup_searching">Searching the network …</string>
@@ -419,7 +419,7 @@
     <string name="seerr_already_requested">This title has already been requested.</string>
     <string name="seerr_request_failed">The request could not be sent.</string>
     <string name="seerr_quota_label">Requests left</string>
-    <string name="seerr_request_hint">The request goes to your server through Seerr. Depending on its settings, it has to be approved first. After that, the title shows up in your library by itself.</string>
+    <string name="seerr_request_hint">The request goes to the server through Seerr. Depending on its settings, it has to be approved first. After that, the title shows up in your library by itself.</string>
     <plurals name="seerr_quota">
         <item quantity="one">%1$d of %2$d per day</item>
         <item quantity="other">%1$d of %2$d per %3$d days</item>
@@ -429,7 +429,7 @@
 
     <!-- Setup (redesign) -->
     <string name="address_heading">Add server</string>
-    <string name="address_intro">Enter the address of your Jellyfin server, as a domain or an IP address.</string>
+    <string name="address_intro">Enter the address of the Jellyfin server you use, as a domain or an IP address.</string>
     <string name="address_hint">Glacier tries HTTPS first, then HTTP, each on the default port and on %1$s. For another port, append %2$s.</string>
     <string name="address_port">Port</string>
     <string name="signin_intro">Sign in with your Jellyfin account. This device stays signed in afterwards.</string>
@@ -592,7 +592,6 @@
     <string name="trailer_again">Watch again</string>
     <string name="trailer_to_details">Back to details</string>
     <string name="trailer_up_next">Up next</string>
-    <string name="trailer_forward">Forward 15 seconds</string>
     <string name="trailer_add_favorite">Add to favorites</string>
     <string name="trailer_error">This trailer can’t be played here.</string>
     <string name="trailer_none">This title has no playable trailers.</string>

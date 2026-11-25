@@ -1,264 +1,137 @@
-<p align="center">
-  <br>
-  <img src="docs/badges/wordmark.svg" height="84" alt="Glacier">
-  <br>
-  <br>
-</p>
+# Nixie for TV
 
-<h3 align="center">The TV is yours again.</h3>
+**Nixie for TV is a Jellyfin app for Android TV and Google TV: Nixie's themes on the big screen, with a player built
+for the remote.** It is the TV sibling of [Nixie for Windows](https://github.com/mbustos27/nixie).
 
-<p align="center">
-  Glacier brings your Jellyfin server to Android TV, Google TV and Fire TV.<br>
-  Playback that adapts instead of stalling, sound and picture as on the disc,<br>
-  and help with every audio and subtitle track.
-</p>
+**Nixie for TV is based on [Glacier](https://github.com/Glacier-Jellyfin/glacier-androidtv) by its authors, under the
+GPL-3.0.** Glacier brings the app itself: sign-in, libraries, item pages, search, the Media3 player with its track
+rules, skips, trickplay and next-episode countdown, profiles, music, photos and live TV. Nixie adds its themes as a
+layer over Glacier's screens, and its own features on top. Glacier's own README, store listings and website belong to
+Glacier; see its repository. Please don't report problems in Nixie for TV to Glacier's authors: they can't fix Nixie.
 
-<p align="center">
-  <a href="https://www.amazon.com/dp/B0HPL2YVVQ"><img src="docs/badges/amazon.svg" height="56" alt="Get it from the Amazon Appstore for Fire TV"></a>
-  <a href="#become-a-tester-on-google-play"><img src="docs/badges/play.svg" height="56" alt="Google Play: become a tester"></a>
-  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/releases/latest/download/glacier-androidtv.apk"><img src="docs/badges/github.svg" height="56" alt="Download the APK from GitHub"></a>
-</p>
+## Install
 
-<p align="center">
-  <a href="https://glacier-jellyfin.github.io/glacier-androidtv/">Website</a> ·
-  <a href="#installation">Installation</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/issues">Report a bug</a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/releases/latest"><img src="https://img.shields.io/github/v/release/Glacier-Jellyfin/glacier-androidtv?sort=semver&amp;style=flat&amp;label=release" alt="Latest release"></a>
-  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/releases"><img src="https://img.shields.io/github/downloads/Glacier-Jellyfin/glacier-androidtv/total?style=flat&amp;label=downloads" alt="Total downloads"></a>
-  <a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Glacier-Jellyfin/glacier-androidtv/ci.yml?branch=main&amp;style=flat&amp;label=CI" alt="CI status"></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/Glacier-Jellyfin/glacier-androidtv"><img src="https://img.shields.io/ossf-scorecard/github.com/Glacier-Jellyfin/glacier-androidtv?style=flat&amp;label=openssf%20scorecard" alt="OpenSSF Scorecard"></a>
-  <a href="https://www.bestpractices.dev/projects/16652"><img src="https://img.shields.io/cii/level/16652?style=flat&amp;label=openssf%20best%20practices" alt="OpenSSF Best Practices"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/Glacier-Jellyfin/glacier-androidtv?style=flat" alt="License"></a>
-</p>
-
-<p align="center">
-  <img src="website/assets/screenshots/demo.gif" width="800" alt="Highlights of Glacier on a TV">
-</p>
-
-> [!NOTE]
-> Glacier is young and still growing. If something does not work, please
-> [report it](https://github.com/Glacier-Jellyfin/glacier-androidtv/issues).
-
-## What Glacier does differently
-
-<p align="center">
-  <img src="website/assets/screenshots/detail-zoom.jpg" width="32%" alt="A title's page with the audio track list, including Commentary and Audio description">
-  <img src="website/assets/screenshots/picture.jpg" width="32%" alt="A film plays: icebergs in the evening sun">
-  <img src="website/assets/screenshots/musicvideo.jpg" width="32%" alt="A music video in the music player, next to the queue">
-</p>
-
-**Playback that does not stall.** Glacier keeps an eye on your connection. If
-it gets slower, the picture steps down to 4K, 1080p or 720p and back up later,
-without a pause. The TV switches to the frame rate of the film, so movement
-stays smooth.
-
-**Help with audio and subtitles.** Forced subtitles, commentary, audio
-description and more carry a clear mark, even when the file does not say so.
-Every language shows its flag, so you see at once which track is which. Glacier
-never starts a commentary by mistake and can keep your choice for each show.
-
-**Sound and picture as on the disc.** TrueHD and DTS-HD reach your receiver
-untouched, even where Android usually gives up. Dolby Vision plays even from
-UHD Blu-rays. If something does not get through, surround stays anyway.
-
-**A music player of its own.** Songs and music videos play in one queue. The
-lyrics run along in time, the music keeps playing while you browse, and radio
-stations play like music too.
-
-## For everyone in the house
-
-<p align="center">
-  <img src="website/assets/screenshots/picker.jpg" width="49%" alt="Who's watching? with the profiles Alex, Kids and Nora">
-  <img src="website/assets/screenshots/kids.jpg" width="49%" alt="The home screen of the kids profile">
-</p>
-
-Everyone gets a profile with their own picture, colour and progress. The kids
-profile only shows what suits their age, and the PIN goes in with the D-pad.
-New TV? The settings come along.
-
-## What the remote does
-
-<p align="center">
-  <img src="website/assets/screenshots/library.jpg" width="49%" alt="The movie library with the A–Z rail">
-  <img src="website/assets/screenshots/trickplay.jpg" width="49%" alt="Seeking with a preview picture above the timeline">
-</p>
-
-- OK skips the intro, and recaps skip themselves. Credits can skip too
-- Seeking shows preview pictures, so you land on the right scene. Chapters are
-  one press away
-- The next episode is ready before the credits end, with a countdown that can
-  shrink out of the way. If a scene still follows the credits, Glacier waits
-  for it
-- The A–Z rail jumps straight to the letter. Large libraries open fast, and
-  sorts by year, date added or artist show a heading over each group
-- Several versions of a title, such as 2160p and 1080p or a director's cut,
-  with the right one picked for your TV and your pick kept per movie or show
-
-## The shelf next to it
-
-<p align="center">
-  <img src="website/assets/screenshots/photos.jpg" width="49%" alt="The photo gallery">
-  <img src="website/assets/screenshots/livetv.jpg" width="49%" alt="Live TV with the channel list and a preview">
-</p>
-
-- **Photos and home videos** by folder, as cards or a gallery, full screen with
-  a slideshow on OK
-- **Live TV** with a running preview on every channel, a programme guide,
-  recordings of programmes and series, pause and rewind, and radio stations
-  that play like music
-
-## The small print
-
-- Search also finds titles missing from your library and requests them
-  through Seerr (needs the Jellyfin Enhanced plugin on the server)
-- Multiple servers and profiles, server discovery and Quick Connect. A start
-  profile can open by itself
-- Parental controls with age limits and PINs for profiles, titles and
-  settings, stored only on the device
-- Local and YouTube trailers with subtitles, and theme songs on detail pages
-- A Favorites page with everything you marked with the heart, in the rows you
-  pick
-- Audio and subtitle preferences synced with your Jellyfin account
-- On the Android TV home screen itself, before you open Glacier: "Watch next"
-  and up to three rows of your choice
-- English, German and Spanish user interface, accent colours and a compact layout
-- When playback fails, the message names the error and shows a QR code to
-  download the log for a bug report. Settings › System also sends a cleaned
-  log to your server
-- Built-in updates for the GitHub version, with a Stable and a Beta channel
-
-## Requirements
-
-| | |
+| You need | |
 |---|---|
-| Device | Android TV, Google TV or Fire TV running Android 9 (API 28) or newer |
-| Server | Jellyfin 12.0 or newer |
+| A TV box or TV | Android TV or Google TV, Android 9 or newer, an ARM processor (32- or 64-bit) |
+| A server | A Jellyfin server, version 12.0 or newer, and an account on it |
 
-## Installation
+Nixie for TV comes from this repository's [releases](https://github.com/mbustos27/nixie-tv/releases) only; it is not
+in an app store. Each release has three files:
 
-Glacier is free and needs no account.
+- **`Nixie-TV-<version>.apk`**, the app.
+- **`Nixie-TV-<version>.apk.sha256`**, its checksum ([SECURITY.md](SECURITY.md) shows how to compare them).
+- **`nixie-tv.apk`**, the same app under a name that never changes, so
+  `https://github.com/mbustos27/nixie-tv/releases/latest/download/nixie-tv.apk` is always the newest release.
 
-### On your TV in two minutes
+Install the APK with a downloader or file-manager app on the box (Android asks once to let that app install apps), or
+from a computer with `adb install Nixie-TV-<version>.apk`. It installs beside Glacier and doesn't share its settings.
+Fire TV comes later ([docs/FIRE-TV-PLAN.md](docs/FIRE-TV-PLAN.md)).
 
-<img src="docs/badges/code.svg" width="300" alt="Downloader code 2423112">
+**Updates:** Nixie checks for a new release at every start (Settings › System › Check for updates automatically turns
+that off; Check for updates checks at once). It asks GitHub's releases API for this repository's releases and nothing
+else, and sends nothing about you beyond what any web request carries: no server, account, library or device facts. A
+new release shows its notes and waits for you; nothing downloads or installs until you choose Update now. Nixie takes
+only `Nixie-TV-<version>.apk`, and checks its SHA-256 against the digest GitHub publishes, its package name and its
+version before installing. Android then refuses any update that isn't signed with the same key as the installed app.
 
-1. Install the free [Downloader](https://www.aftvnews.com/downloader/) app from
-   the app store on your TV.
-2. Open it, enter the code **2423112** and allow the install.
-3. Done. The code always loads the newest version, and from then on Glacier
-   keeps itself up to date.
+## The themes
 
-### From a store
+Settings › Appearance › Theme switches at once, and your place is kept.
 
-<a href="https://www.amazon.com/dp/B0HPL2YVVQ"><img src="docs/badges/amazon.svg" height="56" alt="Get it from the Amazon Appstore for Fire TV"></a>
-<a href="#become-a-tester-on-google-play"><img src="docs/badges/play.svg" height="56" alt="Google Play: become a tester"></a>
+- **Drive-in**, the default: a desert-sunset palette, warm glass on the bar and buttons, a two-tone neon focus ring,
+  and nixie tubes for numbers.
+- **Cinematic**: a night-dark page, glass on the bar, and a white-rimmed focus frame in a wide glow, easy to follow from
+  the couch.
+- **Editorial**: an ink page with serif headings, flat tints instead of glass, and a focus frame like a printer's
+  double rule.
 
-The Amazon Appstore has Glacier for Fire TV, and the store keeps it up to
-date like any other app. Google Play is in closed testing.
+Debug builds also offer Glacier's own look, for comparing.
 
-### Become a tester on Google Play
+## What it does
 
-> [!TIP]
-> Google publishes apps from new personal developer accounts only after a
-> closed test with at least 12 testers over 14 days. If you have an Android TV
-> or Google TV, you can be one of them:
->
-> 1. Join the [tester group](https://groups.google.com/g/glacier-jellyfin-client-testers)
->    with the Google account you use on your TV.
-> 2. [Opt in to the test](https://play.google.com/apps/testing/io.github.glacier_jellyfin.androidtv)
->    with the same account.
-> 3. Open the Play Store on your TV and install Glacier. It can take a few
->    minutes until it shows up.
+- **Home** shows Continue watching, then Up next.
+- **Big libraries open fast:** the first page shows while the rest loads, and the A–Z rail jumps without reading the
+  whole library first.
+- **Search** shows each kind of result as it arrives.
+- **Playback** on the box's own decoders: 4K, HDR10 and Dolby Vision where the TV shows them, DTS and TrueHD decoded
+  in the app when the box can't, styled ASS subtitles, trickplay, frame-rate matching and the next-episode countdown.
+  The player lets go in standby and comes back paused where you were.
+- **Skips:** intros and credits from the server, from the file's chapters, and learned from what you skip by hand.
+  Looking them up online stays off until you turn it on.
+- **Continue watching:** hold OK on a title to remove it, with Undo for 10 seconds. The same row can show on the TV's
+  home screen, where the home screen supports it.
+- **Trailers** from the server, or from YouTube.
+- **Profiles** with PINs and age limits, Quick Connect, music, photos, live TV with a guide, and requests where the
+  server offers Seerr.
+- **English, German and Spanish**, following the TV's language.
 
-### As an APK
+## Report a problem
 
-<a href="https://github.com/Glacier-Jellyfin/glacier-androidtv/releases/latest/download/glacier-androidtv.apk"><img src="docs/badges/github.svg" height="56" alt="Download the APK from GitHub"></a>
+1. On the TV, open **Settings › System › Diagnostics**. For a playback problem, turn on **Detailed logging** first and
+   make the problem happen again.
+2. Choose **Report a problem** and scan the code with a phone. It opens the **Report a problem** form here, with the
+   app's and the server's versions filled in. The TV sends nothing.
+3. For the log, choose **Download log on the network** and scan that code with a phone on the same network. The phone
+   saves the log as a text file (server addresses and names, signed-in users' names, passwords and access tokens are
+   taken out first; [PRIVACY.md](PRIVACY.md#logs-and-report-a-problem) says what stays). Drag it into the form.
 
-Download
-[`glacier-androidtv.apk`](https://github.com/Glacier-Jellyfin/glacier-androidtv/releases/latest/download/glacier-androidtv.apk)
-and sideload it, for example with `adb install glacier-androidtv.apk`. All
-versions are on the [releases page](https://github.com/Glacier-Jellyfin/glacier-androidtv/releases).
+Without a phone, [open an issue](https://github.com/mbustos27/nixie-tv/issues/new/choose) with the **Report a problem**
+form. **Send log to the server**, in the same place, sends the log to the server admin's dashboard, not here.
 
-<details>
-<summary><b>Updates</b></summary>
+## Privacy, in short
 
-Installed from GitHub, Glacier keeps itself up to date. It checks for new versions
-at every start and installs them from GitHub releases. Android asks once for
-permission to install updates from Glacier. You can pick the Stable or Beta
-channel in Settings › System.
+No account, analytics, ads or telemetry. What leaves the box:
 
-</details>
+- **The Jellyfin server you use** gets what any Jellyfin app sends: sign-in, what you play and how far, watched marks
+  and favourites, and a copy of your Nixie settings.
+- **The TV's home screen** gets your Continue watching titles, as Android TV apps do (Settings › Home turns it off).
+- **YouTube:** on a page with a YouTube trailer, Nixie loads YouTube's player empty; YouTube gets the video's id only
+  when you press Trailer.
+- **GitHub** is asked for new releases at every start (you can turn it off), with nothing about you.
+- **Online skip lookups** send a show's public id, the episode's number and its length, only once you turn them on.
+- **Logs** leave the box only when you fetch or send one.
 
-<details>
-<summary><b>Checking a download</b></summary>
+All of it, with what each service gets: [PRIVACY.md](PRIVACY.md).
 
-Every release is built on GitHub from the source code in this repository and
-carries a signed build provenance attestation. With the
-[GitHub CLI](https://cli.github.com/) you can check that your APK came from
-here:
+## Build
 
-```sh
-gh attestation verify glacier-androidtv.apk --repo Glacier-Jellyfin/glacier-androidtv
+Needs the Android SDK (platform 37) and JDK 21 (Android Studio's own works), set for the shell only:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+.\gradlew.bat :app:assembleNixieDebug testDebugUnitTest :app:testNixieDebugUnitTest
+# app\build\outputs\apk\nixie\debug\app-nixie-debug.apk
 ```
 
-</details>
+- One flavor, `nixie`: application id `io.github.mbustos27.nixie.tv`, debug builds `.debug` beside it.
+- The version is `nixie.version` in `gradle.properties`, versionCode by Glacier's rule
+  (major × 1,000,000 + minor × 10,000 + patch × 100 + beta, 99 for a stable release).
+- The FFmpeg audio decoder (DTS, TrueHD) needs its native part built first: [core/ffmpeg/README.md](core/ffmpeg/README.md).
+- Debug builds switch themes with `adb shell am start -n io.github.mbustos27.nixie.tv.debug/io.github.glacier_jellyfin.androidtv.MainActivity --es nixie.theme Cinematic`.
 
-## Building
+## Development
 
-Requirements: JDK 17 or newer and the Android SDK (Android Studio installs it).
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to report, suggest and send changes.
+- [docs/DESIGN-RULES.md](docs/DESIGN-RULES.md): what every change and bug hunt looks for (speed on big servers,
+  standby, device facts, the way up from any page, the user is not the server's admin).
+- [docs/GLACIER-BASE.md](docs/GLACIER-BASE.md): what Glacier covers and what Nixie adds.
+- [DIVERGENCE.md](DIVERGENCE.md): every change to a Glacier file.
+- [docs/THEMES.md](docs/THEMES.md): how the themes plug into Glacier's screens.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Glacier's module layout, which Nixie keeps.
+- [testing/README.md](testing/README.md): the fake Jellyfin server's profiles. Tests never touch a real server.
+- `tools/release-check`: `nixie-release`, the release checks (signature, manifest, versionCode, ABIs, the FFmpeg
+  decoder, alignment, size, `.sha256`). It never signs and never reads a key.
 
-```sh
-./gradlew assembleDebug        # debug APK in app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest    # unit tests
-```
+## Glacier's updates
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module layout and
-[docs/RELEASING.md](docs/RELEASING.md) for versioning and releases.
+`upstream` is Glacier, fetch only. Each Glacier release that builds is merged with `git merge`; Nixie's changes stay
+in its own modules and in hooks marked `// Nixie:` (the rule: [docs/GLACIER-BASE.md](docs/GLACIER-BASE.md#merging-glaciers-updates)).
 
-## How I build Glacier
+## Licence
 
-Glacier is a hobby project. I work as a software developer, and next to my
-job I use Glacier to find out how to build software together with AI.
-
-I want to be open about what that means. Almost all code, tests and
-documentation are written with
-[Claude Code](https://claude.com/claude-code), Anthropic's coding assistant,
-working together with me. Every commit it worked on says so with a
-`Co-Authored-By: Claude` line, and today that is nearly every commit.
-
-I decide what Glacier does and how it looks and feels. I review the changes
-and test them on my own TVs and the Android TV emulator before they ship. On
-top of that, every change goes through lint, unit tests and security scans in
-CI, and releases are built only by GitHub from the public source code.
-
-Glacier itself has no AI features and sends nothing to AI services. AI makes
-mistakes, and so do I. If something looks wrong, please
-[tell me](https://github.com/Glacier-Jellyfin/glacier-androidtv/issues).
-
-## Contributing
-
-Bug reports, ideas, pull requests and translations are welcome. Please read
-[CONTRIBUTING.md](CONTRIBUTING.md) first.
-
-## Support
-
-Glacier is built in spare time and stays free. A
-[star on GitHub](https://github.com/Glacier-Jellyfin/glacier-androidtv) takes
-one click and helps other Jellyfin fans find Glacier. If it makes your evenings
-a little better, a coffee on Ko-fi keeps it going.
-
-<a href="https://ko-fi.com/jeansy91"><img src="docs/badges/kofi.svg" height="56" alt="Buy me a coffee on Ko-fi"></a>
-
-## License
-
-Glacier is licensed under the [GNU General Public License v3.0 or later](LICENSE).
-Third-party parts (fonts, flags, the Media3 decoder module and others) keep their own
-licences, listed in [REUSE.toml](REUSE.toml) with the texts in [LICENSES/](LICENSES/).
-
-Glacier is an independent project and is not affiliated with the Jellyfin project.
-Amazon, Amazon Appstore and the Amazon logo are trademarks of Amazon.com, Inc. or
-its affiliates. Google Play and the Google Play logo are trademarks of Google LLC.
+GPL-3.0-or-later ([LICENSE](LICENSE)), as Glacier. Every copyright and REUSE notice is kept: Glacier's files are
+"Glacier contributors", Nixie's own files "Nixie contributors" ([REUSE.toml](REUSE.toml)); third-party parts keep
+their licences, with the texts in [LICENSES/](LICENSES/). Nixie for TV is not affiliated with the Jellyfin project or
+with Glacier's authors. Android TV and Google TV are trademarks of Google LLC.

@@ -30,6 +30,8 @@ data class UpdaterConfig(
     val feedUrl: String,
     /** False where a store delivers the updates (the Amazon and Play builds): the updater never checks then. */
     val selfUpdate: Boolean = true,
+    // Nixie: whether the check at start is on before the user chose; on in Nixie's release, off in its test builds.
+    val autoCheckDefault: Boolean = true,
 )
 
 /** Where the app update stands (Settings › System, update dialog). */
@@ -97,7 +99,7 @@ class UpdateManager @Inject constructor(@ApplicationContext private val context:
     )
     val channel: StateFlow<UpdateChannel> = _channel.asStateFlow()
 
-    private val _autoCheck = MutableStateFlow(prefs.getBoolean(KEY_AUTO, true))
+    private val _autoCheck = MutableStateFlow(prefs.getBoolean(KEY_AUTO, config.autoCheckDefault))
     val autoCheck: StateFlow<Boolean> = _autoCheck.asStateFlow()
 
     /** Whether the automatic check may open the home screen dialog. */

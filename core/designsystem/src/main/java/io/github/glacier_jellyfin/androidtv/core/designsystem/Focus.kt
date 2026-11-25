@@ -37,6 +37,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.NixieVisuals
+import io.github.mbustos27.nixie.tv.designsystem.themedFocusFrame
 
 /** Focus scale from the design (`focusScale` 1.07). */
 const val FocusScale = 1.07f
@@ -140,7 +143,8 @@ fun GlacierCard(
 @Composable
 fun Modifier.focusScale(focused: Boolean, maxWidthGrowth: Dp = Dp.Unspecified): Modifier {
     val scale by animateFloatAsState(
-        targetValue = if (focused && !LocalReduceMotion.current) FocusScale else 1f,
+        // Nixie: a theme's own focus zoom (Cinematic: 1.1).
+        targetValue = if (focused && !LocalReduceMotion.current) themedFocusScale() else 1f,
         animationSpec = tween(200),
         label = "focusScale",
     )
@@ -149,7 +153,7 @@ fun Modifier.focusScale(focused: Boolean, maxWidthGrowth: Dp = Dp.Unspecified): 
         scaleX = if (maxWidthGrowth == Dp.Unspecified || size.width <= 0f) {
             scale
         } else {
-            val growth = ((scale - 1f) / (FocusScale - 1f)) * maxWidthGrowth.toPx()
+            val growth = ((scale - 1f) / (themedFocusScale() - 1f)) * maxWidthGrowth.toPx()
             minOf(scale, 1f + growth / size.width)
         }
     }
@@ -164,6 +168,10 @@ fun Modifier.focusFrame(
     borderWidth: Int = 2,
 ): Modifier {
     val accent = LocalAccent.current.main
+    // Nixie: a theme's own focus frame (Drive-in: a two-tone neon ring).
+    NixieTheme.tokens.focus?.let { return themedFocusFrame(focused, shape, it, unfocusedBorder, borderWidth) }
+    // Nixie (TV-S2): no invisible border drawn on every card at rest.
+    if (!focused && unfocusedBorder.alpha == 0f) return this
     return this
         .then(if (focused) Modifier.focusRing(shape, accent) else Modifier)
         .border(borderWidth.dp, if (focused) accent else unfocusedBorder, shape)
@@ -171,14 +179,21 @@ fun Modifier.focusFrame(
 
 /** `box-shadow: 0 0 0 4px accent/0.3, 0 22px 48px -16px rgba(0,0,0,.7)`. */
 private fun Modifier.focusRing(shape: Shape, accent: Color): Modifier = this
-    .dropShadow(
-        shape,
-        Shadow(
-            radius = 48.dp,
-            spread = (-16).dp,
-            color = Color.Black.copy(alpha = 0.7f),
-            offset = DpOffset(0.dp, 22.dp),
-        ),
+    // Nixie: no soft shadow (an offscreen blur) on boxes that cannot afford it (NixieVisuals).
+    .then(
+        if (NixieVisuals.current.shadows) {
+            Modifier.dropShadow(
+                shape,
+                Shadow(
+                    radius = 48.dp,
+                    spread = (-16).dp,
+                    color = Color.Black.copy(alpha = 0.7f),
+                    offset = DpOffset(0.dp, 22.dp),
+                ),
+            )
+        } else {
+            Modifier
+        },
     )
     .drawWithContent {
         val ring = 4.dp.toPx()
@@ -188,6 +203,9 @@ private fun Modifier.focusRing(shape: Shape, accent: Color): Modifier = this
         }
         drawContent()
     }
+
+// Nixie: the theme's focus zoom, Glacier's FocusScale when the theme leaves it unset.
+private fun themedFocusScale(): Float = NixieTheme.tokens.focusZoom.takeIf { !it.isNaN() } ?: FocusScale
 
 /** The remote's menu key, the other way to a long press's options. */
 fun Modifier.onMenuKey(action: () -> Unit): Modifier = onKeyEvent { event ->

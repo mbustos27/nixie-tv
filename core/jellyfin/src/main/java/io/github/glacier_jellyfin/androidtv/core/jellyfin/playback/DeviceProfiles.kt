@@ -41,7 +41,7 @@ object DeviceProfiles {
         videoSegmentSeconds: Int = HLS_SEGMENT_SECONDS,
         smallAudioBitrate: Int? = null,
     ): DeviceProfile = buildDeviceProfile {
-        name = "Glacier"
+        name = "Nixie for TV" // Nixie: the name the server shows
         maxStreamingBitrate = maxBitrate
         maxStaticBitrate = maxBitrate
         musicStreamingTranscodingBitrate = MUSIC_BITRATE

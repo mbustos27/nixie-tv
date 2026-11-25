@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import io.github.mbustos27.nixie.tv.designsystem.nixiePanelChrome
 
 /** Width of the panel at the end edge (design px of the 1920 grid). */
 private const val PANEL_WIDTH = 620
@@ -98,7 +99,8 @@ fun OptionsPanel(
             // Offsets are absolute: from the right edge, or from the left in a right-to-left layout.
             enter = slideInHorizontally(tween(ENTER_MS)) { if (rtl) -it else it } + fadeIn(tween(ENTER_MS)),
         ) {
-            Row(Modifier.fillMaxHeight().width(PANEL_WIDTH.dp).background(GlacierColors.Deep)) {
+            // Nixie: a theme's panel chrome (NixieSlots.player.panelChrome).
+            Row(Modifier.fillMaxHeight().width(PANEL_WIDTH.dp).nixiePanelChrome { background(GlacierColors.Deep) }) {
                 // The inner edge.
                 Box(Modifier.fillMaxHeight().width(1.dp).background(GlacierColors.GlassBorder2))
                 Column(

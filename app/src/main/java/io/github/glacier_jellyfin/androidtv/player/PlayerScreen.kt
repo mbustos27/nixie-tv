@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -64,6 +65,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.blockKeysWhile
 import io.github.glacier_jellyfin.androidtv.detail.TrackKind
 import io.github.glacier_jellyfin.androidtv.ui.Artwork
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 import kotlinx.coroutines.delay
 
 /** OSD hides after this long without input while playing (agreed: 3 s). */
@@ -89,7 +91,11 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     CollectEvents(viewModel.events, onNavigate = {})
     BackHandler { viewModel.stop() }
     // Leaving the app (Home button) pauses; nobody is watching.
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
+    // Nixie (TV-S8): and lets the player go (standby, the screensaver); it comes back paused where it was.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        viewModel.pause()
+        viewModel.nixieBackground()
+    }
     MatchFrameRate(state.file?.video?.frameRate?.takeIf { it > 0 }, state.matchFrameRate)
     val view = LocalView.current
     // Only while playback is meant to run: a paused or failed screen lets the TV start its screensaver (OLED burn-in).
@@ -166,6 +172,8 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
         viewModel.seekTo(target)
         scrubMs = null
     }
+    // Nixie (TV-S8): back from the background the title waits paused, the controls up on the seek bar, as after a pause.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { if (viewModel.nixieForeground()) showOsd(seekFocus) }
     LaunchedEffect(osdVisible, interaction, state.playing, scrubMs, overlayOpen) {
         if (osdVisible && state.playing && scrubMs == null && !overlayOpen) {
             delay(OSD_TIMEOUT_MS)
@@ -186,6 +194,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     LaunchedEffect(upNext != null, osdVisible, upNextWake, state.upNextCollapseMs) {
         upNextCollapsed = false
         if (upNext == null || osdVisible || state.upNextCollapseMs <= 0) return@LaunchedEffect
+        if (!upNext.second.autoPlay) return@LaunchedEffect // Nixie: a card without a countdown does not shrink to one
         delay(state.upNextCollapseMs)
         upNextCollapsed = true
     }
@@ -298,6 +307,12 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                         true
                     } else {
                         false
+                    }
+
+                    // Nixie (TV-S3): the menu key shows the controls (and keeps them up), as in the trailer player.
+                    Key.Menu -> {
+                        if (!osdVisible) showOsd(playFocus)
+                        true
                     }
 
                     else -> false
@@ -448,7 +463,15 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             }
         }
 
-        if (state.failed) PlaybackFailureCard(state, onRetry = viewModel::load, onBack = viewModel::stop)
+        if (state.failed) {
+            // Nixie (integration 1): the log question's answer.
+            PlaybackFailureCard(
+                state,
+                onRetry = viewModel::load,
+                onBack = viewModel::stop,
+                onLogAnswer = viewModel::answerLog,
+            )
+        }
     }
 }
 
@@ -458,10 +481,17 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
  */
 internal fun Modifier.osdScrim(top: Boolean): Modifier = fillMaxWidth()
     .height(if (top) 280.dp else 560.dp)
-    .background(
-        if (top) {
-            Brush.verticalGradient(0f to Color(0xF0050910), 0.55f to Color(0x99050910), 1f to Color.Transparent)
-        } else {
-            Brush.verticalGradient(0f to Color.Transparent, 0.4f to Color(0xA6050910), 1f to Color(0xF5050910))
-        },
+    // Nixie: a theme's shade (NixieSlots.player.osdScrim) in place of Glacier's gradient.
+    .then(
+        NixieTheme.slots.player.osdScrim
+            ?.let { scrim -> Modifier.drawBehind { scrim(top) } }
+            ?: Modifier.glacierScrim(top),
     )
+
+private fun Modifier.glacierScrim(top: Boolean): Modifier = background(
+    if (top) {
+        Brush.verticalGradient(0f to Color(0xF0050910), 0.55f to Color(0x99050910), 1f to Color.Transparent)
+    } else {
+        Brush.verticalGradient(0f to Color.Transparent, 0.4f to Color(0xA6050910), 1f to Color(0xF5050910))
+    },
+)

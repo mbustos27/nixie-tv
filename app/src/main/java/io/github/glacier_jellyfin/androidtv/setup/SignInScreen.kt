@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.blockKeysWhile
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.ServerInfo
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.designsystem.NixieFeatures
 
 @Composable
 fun SignInScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SignInViewModel = hiltViewModel()) {
@@ -58,6 +60,15 @@ fun SignInScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SignInViewMo
     fun edit(field: SignInField) {
         viewModel.selectField(field)
         keyboardOpen = true
+    }
+
+    // Nixie: Quick Connect first when the server offers it; "Use password" there comes back to this screen.
+    var quickConnectOffered by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.quickConnectAvailable) {
+        if (NixieFeatures.quickConnectFirst && state.quickConnectAvailable && !quickConnectOffered) {
+            quickConnectOffered = true
+            viewModel.openQuickConnect()
+        }
     }
 
     // The overlay does not stop the buttons behind it: swallow the keys while signing in.

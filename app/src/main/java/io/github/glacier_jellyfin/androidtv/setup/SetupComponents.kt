@@ -53,6 +53,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.ModalSheet
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillButton
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.ServerInfo
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
 /**
  * The two-column frame shared by all setup screens: an intro column of 560
@@ -64,13 +65,17 @@ fun SetupLayout(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Row(
-        modifier = modifier.fillMaxSize().padding(horizontal = 130.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(110.dp),
-    ) {
-        Column(Modifier.width(560.dp), verticalArrangement = Arrangement.spacedBy(26.dp), content = intro)
-        Column(Modifier.weight(1f).widthIn(max = 880.dp).padding(horizontal = 24.dp), content = content)
+    // Nixie: a theme's own backdrop behind the two columns (Drive-in: the lot at dusk).
+    Box(modifier.fillMaxSize()) {
+        NixieTheme.slots.setupBackdrop?.invoke(this)
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 130.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(110.dp),
+        ) {
+            Column(Modifier.width(560.dp), verticalArrangement = Arrangement.spacedBy(26.dp), content = intro)
+            Column(Modifier.weight(1f).widthIn(max = 880.dp).padding(horizontal = 24.dp), content = content)
+        }
     }
 }
 

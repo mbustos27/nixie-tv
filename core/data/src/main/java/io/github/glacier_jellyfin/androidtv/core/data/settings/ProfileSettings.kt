@@ -7,6 +7,7 @@ import io.github.glacier_jellyfin.androidtv.core.data.playback.SegmentKind
 import io.github.glacier_jellyfin.androidtv.core.data.playback.SegmentPolicy
 import io.github.glacier_jellyfin.androidtv.core.data.playback.UpNextMode
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.playback.SubtitleBurnIn
+import io.github.mbustos27.nixie.tv.data.NixieHomeSettings
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -42,6 +43,16 @@ data class ProfileSettings(
     val folders: FolderSettings = FolderSettings(),
     /** How the music videos tab lists them; null until picked, when their metadata decides. */
     val musicVideoView: MusicVideoView? = null,
+    // Nixie (home stream): Continue Watching and Up next settings, apart from Glacier's.
+    val nixieHome: NixieHomeSettings = NixieHomeSettings(),
+    // Nixie (play stream): skips from chapters, online lookups and learned skips; its own key, apart from Glacier's.
+    val nixiePlay: io.github.mbustos27.nixie.tv.data.play.NixiePlaySettings =
+        io.github.mbustos27.nixie.tv.data.play.NixiePlaySettings(),
+    // Nixie (play stream) end.
+    // Nixie (tv-watchnext): Continue watching on the TV's home screen; its own key, apart from Glacier's.
+    val nixieWatchNext: io.github.mbustos27.nixie.tv.data.watchnext.NixieWatchNextSettings =
+        io.github.mbustos27.nixie.tv.data.watchnext.NixieWatchNextSettings(),
+    // Nixie (tv-watchnext) end.
 )
 
 @Serializable

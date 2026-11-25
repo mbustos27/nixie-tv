@@ -27,8 +27,10 @@ data class DeviceSettings(
  * below), one custom preference per device. Nothing else is stored there, so a
  * write sends back only these keys.
  */
-private const val PREFERENCES_ID = "glacier-settings"
-private const val CLIENT = "glacier"
+// Nixie: its own item and client, so a Nixie install and a Glacier install on one account never take each other's
+// copies (Nixie never shipped with Glacier's, so there is nothing to move over).
+internal const val PREFERENCES_ID = "nixie-tv-settings"
+internal const val CLIENT = "nixie-tv"
 private const val KEY_PREFIX = "device."
 
 private val json = Json {

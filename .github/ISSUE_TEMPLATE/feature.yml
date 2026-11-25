@@ -1,0 +1,79 @@
+name: Suggest an idea
+description: Something Nixie for TV could do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If your idea is already in the open issues, a comment or a thumbs-up there counts for more than a new one.
+
+        **Never paste a server address, user name, password or token.** None of it is needed, and this page is public.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like Nixie for TV to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What it's for
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      description: The themes in Settings › Appearance › Theme it's for.
+      multiple: true
+      options:
+        - All of them
+        - Drive-in
+        - Cinematic
+        - Editorial
+        - It isn't about the look
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where in Nixie
+      multiple: true
+      options:
+        - Signing in or choosing a profile
+        - Home
+        - A library or collection
+        - A film, show, season or episode page
+        - Playing video
+        - Trailers
+        - Search
+        - Music, photos or live TV
+        - Settings
+        - The TV's home screen
+        - Something new
+    validations:
+      required: false
+
+  - type: input
+    id: device
+    attributes:
+      label: TV box or TV
+      description: Only if the idea is about one kind of box (a remote's buttons, a sound system, a TV's picture modes).
+      placeholder: Chromecast with Google TV (4K)
+    validations:
+      required: false
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: |
+        An app that does it well, a sketch or a photo. Cover server names and addresses, and never paste a server address, user name, password or token.
+    validations:
+      required: false

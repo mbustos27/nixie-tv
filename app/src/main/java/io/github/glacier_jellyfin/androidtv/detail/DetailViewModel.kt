@@ -43,6 +43,10 @@ import io.github.glacier_jellyfin.androidtv.navigation.routeFor
 import io.github.glacier_jellyfin.androidtv.parental.PinGate
 import io.github.glacier_jellyfin.androidtv.player.VersionChooser
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.data.ResumeSnapshot
+import io.github.mbustos27.nixie.tv.data.WatchedServer
+import io.github.mbustos27.nixie.tv.data.WatchedUndo
+import io.github.mbustos27.nixie.tv.data.WatchedUndoResult
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -106,7 +110,12 @@ class DetailViewModel @Inject constructor(
     private val ageFilter: AgeFilter,
     private val musicPlayback: MusicController,
     private val versions: VersionChooser,
+    // Nixie: Undo after marking a show or season watched (WatchedUndo).
+    watchedServer: WatchedServer,
 ) : ViewModel() {
+
+    // Nixie: see the constructor.
+    private val nixieWatched = WatchedUndo(viewModelScope, watchedServer)
 
     private var itemId: UUID = UUID.fromString(savedStateHandle.toRoute<DetailRoute>().itemId)
 
@@ -634,6 +643,8 @@ class DetailViewModel @Inject constructor(
     fun togglePlayed() {
         val item = _state.value.item ?: return
         if (item.kind == ItemKind.Collection) return toggleCollectionPlayed(item)
+        // Nixie: Seen again while the Undo is open puts the episodes back as they were.
+        if (nixieWatched.isOpen(item.id)) return nixieUndoWatched(item.id, item.id)
         val played = !item.played
         val before = _state.value
         updateItem(playedMark(played))
@@ -649,6 +660,8 @@ class DetailViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Nixie: what the episodes were at, for the Undo.
+            val nixieBefore = if (item.kind == ItemKind.Series && played) nixieWatched.snapshot(item.id) else null
             runSuspendCatching { repository.setPlayed(item.id, played) }
                 .onSuccess {
                     toast(
@@ -659,6 +672,7 @@ class DetailViewModel @Inject constructor(
                             else -> R.string.marked_unwatched
                         },
                     )
+                    nixieOfferUndo(item.id, nixieBefore, R.string.nixie_marked_watched_undo) // Nixie
                     // A whole show or collection changes its episodes or movies too.
                     if (item.kind == ItemKind.Series) reloadShowState(item.id)
                     if (item.kind == ItemKind.Collection) loadCollection(_state.value.details ?: return@onSuccess)
@@ -738,6 +752,8 @@ class DetailViewModel @Inject constructor(
     fun toggleSeasonPlayed(season: Season) {
         val show = _state.value.item ?: return
         if (show.kind != ItemKind.Series) return
+        // Nixie: the same choice again while the Undo is open puts the episodes back as they were.
+        if (nixieWatched.isOpen(season.id)) return nixieUndoWatched(show.id, season.id)
         val before = _state.value
         // The sheet's copy of the season may be older than the page's.
         val played = !(before.seasons.firstOrNull { it.id == season.id } ?: season).played
@@ -746,9 +762,12 @@ class DetailViewModel @Inject constructor(
         // A show with a season left to watch is not seen.
         if (!played) updateItem { it.copy(played = false) }
         viewModelScope.launch {
+            // Nixie: what the episodes were at, for the Undo.
+            val nixieBefore = if (played) nixieWatched.snapshot(season.id) else null
             runSuspendCatching { repository.setPlayed(season.id, played) }
                 .onSuccess {
                     toast(if (played) R.string.marked_watched else R.string.marked_unwatched)
+                    nixieOfferUndo(season.id, nixieBefore, R.string.nixie_season_marked_watched_undo) // Nixie
                     // The show's own seen state follows from its seasons.
                     runSuspendCatching { repository.details(show.id).item.played }
                         .onSuccess { shown -> updateItem { it.copy(played = shown) } }
@@ -898,6 +917,37 @@ class DetailViewModel @Inject constructor(
 
     private fun toast(message: Int) {
         viewModelScope.launch { _events.send(UiEvent.Toast(message)) }
+    }
+
+    // ---- Nixie: Undo after marking a show or season watched (WatchedUndo) ----
+
+    /** The marking of [parentId] took: with what its episodes were at, its Undo opens, and the toast says how. */
+    private fun nixieOfferUndo(
+        parentId: UUID,
+        before: Map<UUID, ResumeSnapshot>?,
+        message: Int,
+    ) {
+        if (before == null) return
+        nixieWatched.open(parentId, before)
+        toast(message)
+    }
+
+    /** Puts the episodes of [parentId] (the show [showId] or one of its seasons) back as they were. */
+    private fun nixieUndoWatched(showId: UUID, parentId: UUID) {
+        _state.update { it.copy(seasonSheet = null) }
+        viewModelScope.launch {
+            toast(
+                when (nixieWatched.undo(parentId)) {
+                    WatchedUndoResult.Restored -> R.string.nixie_watched_undone
+                    is WatchedUndoResult.Partly -> R.string.nixie_watched_undone_partly
+                    WatchedUndoResult.Failed -> R.string.nixie_watched_not_undone
+                    WatchedUndoResult.Gone -> return@launch
+                },
+            )
+            runSuspendCatching { repository.details(showId).item.played }
+                .onSuccess { shown -> updateItem { it.copy(played = shown) } }
+            reloadShowState(showId)
+        }
     }
 
     private fun navigate(route: Any, leaveTitles: Boolean = false) {

@@ -1,5 +1,7 @@
 package io.github.glacier_jellyfin.androidtv.core.jellyfin
 
+import io.github.mbustos27.nixie.tv.jellyfin.DeviceIds
+import io.github.mbustos27.nixie.tv.jellyfin.deviceFor
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +30,8 @@ data class SignedInUser(
     val name: String,
     val primaryImageTag: String?,
     val accessToken: String,
+    // Nixie: the device id the token belongs to (DeviceIds); null only from code that predates it.
+    val deviceId: String? = null,
 )
 
 /** A user as listed on the server's login screen. */
@@ -78,9 +82,11 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
         username: String,
         password: String,
     ): SignInResult = try {
-        val api = jellyfin.createApi(baseUrl = server.address)
+        // Nixie: each sign-in has its own device id, so profiles on one TV do not share a session.
+        val deviceId = DeviceIds.fresh()
+        val api = jellyfin.createApi(baseUrl = server.address, deviceInfo = jellyfin.deviceFor(deviceId))
         val result = api.authenticationApi.authenticateUserByName(username, password).content
-        result.toSignedInUser(server)?.let(SignInResult::Success)
+        result.toSignedInUser(server, deviceId)?.let(SignInResult::Success)
             ?: SignInResult.Failed(IllegalStateException("Server returned no access token"))
     } catch (e: InvalidStatusException) {
         if (e.status == HTTP_UNAUTHORIZED) SignInResult.InvalidCredentials else SignInResult.Failed(e)
@@ -107,7 +113,10 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
     }
 
     fun quickConnect(server: ServerInfo): Flow<QuickConnectState> = flow {
-        val api = jellyfin.createApi(baseUrl = server.address).authenticationApi
+        // Nixie: one device id per attempt, fixed before Initiate: the server ties the code and its token to it.
+        val deviceId = DeviceIds.fresh()
+        val api = jellyfin.createApi(baseUrl = server.address, deviceInfo = jellyfin.deviceFor(deviceId))
+            .authenticationApi
         try {
             if (!api.getQuickConnectEnabled().content) {
                 emit(QuickConnectState.Unavailable)
@@ -128,7 +137,7 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
                 }
                 if (state.authenticated) {
                     val result = api.authenticateWithQuickConnect(session.secret).content
-                    val user = result.toSignedInUser(server)
+                    val user = result.toSignedInUser(server, deviceId)
                         ?: throw IllegalStateException("Server returned no access token")
                     emit(QuickConnectState.Authorized(user))
                     return@flow
@@ -141,10 +150,16 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
         }
     }.flowOn(Dispatchers.IO)
 
+    // Nixie: [deviceId] in the three calls below is the profile's own (StoredUser.deviceId), sent with its token.
+
     /** Ends the session on the server, which invalidates the access token. */
-    suspend fun signOut(address: String, accessToken: String) {
+    suspend fun signOut(
+        address: String,
+        accessToken: String,
+        deviceId: String? = null,
+    ) {
         withContext(Dispatchers.IO) {
-            jellyfin.createApi(baseUrl = address, accessToken = accessToken).sessionApi.reportSessionEnded()
+            profileApi(address, accessToken, deviceId).sessionApi.reportSessionEnded()
         }
     }
 
@@ -152,19 +167,26 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
      * The id of the user a stored token signs in, as the server at [address] knows it;
      * null when the server does not accept the token. Throws when it cannot be reached.
      */
-    suspend fun tokenUserId(address: String, accessToken: String): String? = withContext(Dispatchers.IO) {
+    suspend fun tokenUserId(
+        address: String,
+        accessToken: String,
+        deviceId: String? = null,
+    ): String? = withContext(Dispatchers.IO) {
         try {
-            jellyfin.createApi(baseUrl = address, accessToken = accessToken)
-                .userApi.getCurrentUser().content.id.toString()
+            profileApi(address, accessToken, deviceId).userApi.getCurrentUser().content.id.toString()
         } catch (e: InvalidStatusException) {
             if (e.status == HTTP_UNAUTHORIZED) null else throw e
         }
     }
 
     /** Checks whether a stored token is still accepted. */
-    suspend fun isTokenValid(address: String, accessToken: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isTokenValid(
+        address: String,
+        accessToken: String,
+        deviceId: String? = null,
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
-            jellyfin.createApi(baseUrl = address, accessToken = accessToken).userApi.getCurrentUser()
+            profileApi(address, accessToken, deviceId).userApi.getCurrentUser()
             true
         } catch (e: InvalidStatusException) {
             if (e.status == HTTP_UNAUTHORIZED) false else throw e
@@ -178,7 +200,14 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
     ): String? =
         imageTag?.let { jellyfin.createApi(baseUrl = address).imageApi.getUserImageUrl(userId = userId, tag = it) }
 
-    private fun AuthenticationResult.toSignedInUser(server: ServerInfo): SignedInUser? {
+    // Nixie: a profile's token goes out with the device id it belongs to.
+    private fun profileApi(
+        address: String,
+        accessToken: String,
+        deviceId: String?,
+    ) = jellyfin.createApi(baseUrl = address, accessToken = accessToken, deviceInfo = jellyfin.deviceFor(deviceId))
+
+    private fun AuthenticationResult.toSignedInUser(server: ServerInfo, deviceId: String): SignedInUser? {
         val token = accessToken ?: return null
         val dto = user ?: return null
         return SignedInUser(
@@ -187,6 +216,8 @@ class Authenticator @Inject constructor(private val jellyfin: Jellyfin) {
             name = dto.name.orEmpty(),
             primaryImageTag = dto.primaryImageTag,
             accessToken = token,
+            // Nixie: the device id the token was issued to.
+            deviceId = deviceId,
         )
     }
 

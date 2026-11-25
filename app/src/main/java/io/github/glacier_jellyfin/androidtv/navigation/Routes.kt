@@ -49,6 +49,11 @@ data class LibraryRoute(
     /** Library or genre name shown as the title; the kind name when null. */
     val title: String? = null,
     val genreId: String? = null,
+    // Nixie (tv-home-two-rows): the top bar's Collections page, every collection on the server (LibraryQuery.nixieCollections).
+    val collections: Boolean = false,
+    // Nixie (tv-fix-b): opened by the top bar's entry (a library starred into the bar): Back goes to its tabs and the
+    // bar first, as on the bar's own pages; from Libraries or a title the same library goes back in one press.
+    val fromBar: Boolean = false,
 )
 
 /**

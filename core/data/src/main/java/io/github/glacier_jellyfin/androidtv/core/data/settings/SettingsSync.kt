@@ -73,7 +73,8 @@ class SettingsSync @Inject constructor(
 
     private suspend fun follow(session: Session) {
         val key = profileKey(session.server.id, session.user.userId)
-        val deviceId = session.api.deviceInfo.id
+        // Nixie: the copy is the TV's, keyed by the install's id (a profile has its own, DeviceIds).
+        val deviceId = session.installDeviceId
         val copies = runSuspendCatching { backup.list(session) }
             .onFailure { Log.w(TAG, "Cannot read the settings copies on the server", it) }
             .getOrNull()
@@ -130,7 +131,7 @@ class SettingsSync @Inject constructor(
     /** Deletes this device's copy of the signed-in profile on the server. */
     suspend fun deleteOwnCopy(): Boolean {
         val session = sessions.session.value ?: return false
-        return deleteCopy(session.api.deviceInfo.id)
+        return deleteCopy(session.installDeviceId) // Nixie: the install's id, as above
     }
 
     /** Deletes [deviceId]'s copy of the signed-in profile on the server, like an old install's or a TV no longer used. */

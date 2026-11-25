@@ -20,7 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.createBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.glacier_jellyfin.androidtv.core.log.Log
+import io.github.mbustos27.nixie.tv.NixieTrailers
+import io.github.mbustos27.nixie.tv.trailer.TrailerWarmup
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -58,7 +62,16 @@ interface YouTubeListener {
 
     /** The IFrame API's error code (101/150: embedding not allowed), or [YOUTUBE_NO_WEBVIEW]. */
     fun onYouTubeError(videoId: String, code: Int)
+
+    /** Nixie (tv-player-4k, TV-S9): a step of the start, one of [YOUTUBE_STEPS], for its timing. */
+    fun onYouTubeStep(videoId: String, step: String) = Unit
+
+    /** Nixie (TV-S9): the player was made ahead on the movie page (`TrailerWarmup`); only the video loads now. */
+    fun onYouTubeMadeAhead(videoId: String) = Unit
 }
+
+/** Nixie (TV-S9): the steps of a YouTube trailer's start, in order; the page may name only these. */
+val YOUTUBE_STEPS = listOf("web view", "page", "YouTube API", "player ready")
 
 /** The device has no usable WebView. */
 const val YOUTUBE_NO_WEBVIEW = -1
@@ -82,7 +95,17 @@ fun YouTubePlayer(
 ) {
     val context = LocalContext.current
     val webView = remember(videoId) {
-        runCatching { createWebView(context, videoId, subtitles, listener) }
+        // Nixie (tv-player-4k, TV-S9): the player the movie page made ahead, when it is this video's.
+        // Only now does the video's id go to YouTube (the shell made ahead names no title).
+        TrailerWarmup.take()?.let { warm ->
+            warm.relay.attach(listener, videoId)
+            listener.onYouTubeMadeAhead(videoId)
+            warm.webView.evaluateJavascript(
+                "setSubtitles(${JSONObject.quote(subtitles)}); startVideo(${JSONObject.quote(videoId)});",
+                null,
+            )
+            warm.webView
+        } ?: runCatching { createWebView(context, videoId, subtitles, listener) }
             .onFailure { Log.w(TAG, "No WebView for the YouTube player", it) }
             .getOrNull()
     }
@@ -90,6 +113,7 @@ fun YouTubePlayer(
         LaunchedEffect(videoId) { listener.onYouTubeError(videoId, YOUTUBE_NO_WEBVIEW) }
         return
     }
+    LaunchedEffect(webView) { listener.onYouTubeStep(videoId, "web view") } // Nixie (TV-S9)
     LaunchedEffect(webView) {
         commands.collect { command ->
             val script = when (command) {
@@ -107,15 +131,35 @@ fun YouTubePlayer(
             webView.destroy()
         }
     }
-    AndroidView(factory = { webView }, modifier = modifier)
+    // Nixie (tv-player-4k, design rule 5): in the background the page's work and its timers (the progress every 500 ms)
+    // pause; the app's return resumes them. The only web view of the app, so the timers are its own.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        webView.onPause()
+        webView.pauseTimers()
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        webView.onResume()
+        webView.resumeTimers()
+    }
+    // Nixie (TV-S9): a player made ahead has no parent; the guard keeps a second screen from failing on one.
+    AndroidView(factory = { webView.also { (it.parent as? ViewGroup)?.removeView(it) } }, modifier = modifier)
 }
+
+/**
+ * Nixie (tv-player-4k, TV-S9): the player's shell made ahead: the web view, the page and YouTube's player with no video,
+ * the same requests for every title. Every report goes to [listener] (a [YouTubeRelay] until the trailer screen takes
+ * it); `startVideo(id)` in the page names the video, only when Trailer is pressed.
+ */
+internal fun makeYouTubePlayerAhead(context: Context, listener: YouTubeListener): WebView =
+    createWebView(context, videoId = null, subtitles = "", listener, autoplay = false)
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun createWebView(
     context: Context,
-    videoId: String,
+    videoId: String?, // Nixie (TV-S9): null for the shell made ahead
     subtitles: String,
     listener: YouTubeListener,
+    autoplay: Boolean = true, // Nixie (TV-S9): false for a player made ahead
 ): WebView {
     val webView = WebView(context)
     // The page only needs the network: no files or content providers of the device.
@@ -138,10 +182,14 @@ private fun createWebView(
         webViewClient = object : WebViewClient() {
             // Links inside the player (title, logo) would leave the page; the remote cannot reach them anyway.
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
+
+            // Nixie (TV-S9): the page and the IFrame API's script are in, for the start's timing.
+            override fun onPageFinished(view: WebView, url: String?) = listener.onYouTubeStep(videoId.orEmpty(), "page")
         }
-        addJavascriptInterface(Bridge(videoId, listener), "Glacier")
-        // YouTube refuses embeds without a referrer (error 153): the page claims the project's website as its origin.
-        loadDataWithBaseURL("$ORIGIN/", page(videoId, subtitles), "text/html", "utf-8", null)
+        addJavascriptInterface(Bridge(videoId.orEmpty(), listener), "Glacier")
+        // YouTube refuses embeds without a referrer (error 153).
+        // Nixie: the page lives at Nixie's own app-id origin (NixieTrailers), never another project's site.
+        loadDataWithBaseURL(NixieTrailers.BASE_URL, page(videoId, subtitles, autoplay), "text/html", "utf-8", null)
     }
     return webView
 }
@@ -176,6 +224,12 @@ private class Bridge(private val videoId: String, private val listener: YouTubeL
     fun onError(code: Int) {
         main.post { listener.onYouTubeError(videoId, code) }
     }
+
+    // Nixie (TV-S9): the page's steps; anything but a known step name is dropped (frames share this bridge).
+    @JavascriptInterface
+    fun onStep(step: String) {
+        if (step in YOUTUBE_STEPS) main.post { listener.onYouTubeStep(videoId, step) }
+    }
 }
 
 /**
@@ -187,15 +241,38 @@ private class Bridge(private val videoId: String, private val listener: YouTubeL
  * without subtitles. Player texts (such as "auto-generated") follow the
  * device language.
  */
-private fun page(videoId: String, subtitles: String) = """
+// Nixie: the page as the web view gets it, for the test of its origin and host (NixieTrailersTest).
+internal fun trailerPage(
+    videoId: String?,
+    subtitles: String,
+    autoplay: Boolean = true,
+): String = page(videoId, subtitles, autoplay)
+
+private fun page(
+    videoId: String?,
+    subtitles: String,
+    autoplay: Boolean,
+) = """
     <!doctype html>
     <html><head>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="preconnect" href="${NixieTrailers.EMBED_HOST}">
+    <link rel="preconnect" href="https://i.ytimg.com">
     <style>html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}#player{position:absolute;inset:0;width:100%;height:100%}</style>
     </head><body>
     <div id="player"></div>
     <script>
     var player;
+    // Nixie (TV-S9): the shell made ahead names no video (the same for every title) until startVideo(id), on the press.
+    var videoId = ${videoId?.let { JSONObject.quote(it) } ?: "null"};
+    var shell = ${videoId == null};
+    var startOnReady = $autoplay;
+    var playerReady = false;
+    function startVideo(id) {
+      videoId = id;
+      startOnReady = true;
+      if (playerReady) player.loadVideoById(id);
+    }
     // A language code, or '' for off.
     var subtitles = ${JSONObject.quote(subtitles)};
     function captionsLoaded() {
@@ -265,15 +342,22 @@ private fun page(videoId: String, subtitles: String) = """
       else if (captionsLoaded()) applySubtitles();
     }
     function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        width: '100%', height: '100%', videoId: '$videoId',
+      Glacier.onStep('YouTube API');
+      var options = {
+        host: '${NixieTrailers.EMBED_HOST}',
+        width: '100%', height: '100%',
         playerVars: {
-          autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1, iv_load_policy: 3, cc_load_policy: 1,
+          autoplay: ${if (autoplay) 1 else 0}, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1, iv_load_policy: 3, cc_load_policy: 1,
           hl: ${JSONObject.quote(Locale.getDefault().language)}, origin: '$ORIGIN'
         },
         events: {
           onReady: function (e) {
-            e.target.playVideo();
+            playerReady = true;
+            Glacier.onStep('player ready');
+            if (startOnReady) {
+              if (shell) e.target.loadVideoById(videoId);
+              else e.target.playVideo();
+            }
             setInterval(function () {
               syncSubtitles();
               Glacier.onProgress(player.getCurrentTime() * 1000, (player.getDuration() || 0) * 1000);
@@ -287,12 +371,15 @@ private fun page(videoId: String, subtitles: String) = """
           onApiChange: onApiChange,
           onError: function (e) { Glacier.onError(e.data); }
         }
-      });
+      };
+      if (videoId) options.videoId = videoId;
+      player = new YT.Player('player', options);
     }
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
     </body></html>
 """.trimIndent()
 
-private const val ORIGIN = "https://glacier-jellyfin.github.io"
+// Nixie: the app's own origin, where Glacier used its website's.
+private const val ORIGIN = NixieTrailers.ORIGIN
 private const val TAG = "YouTubePlayer"

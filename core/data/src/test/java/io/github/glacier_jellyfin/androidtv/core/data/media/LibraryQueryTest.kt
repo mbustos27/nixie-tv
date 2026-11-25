@@ -53,16 +53,15 @@ class LibraryQueryTest {
     }
 
     @Test
-    fun `unwatched keeps movies grouped into collections, favorites and genres do not`() {
-        assertTrue(LibraryQuery(LibraryKind.Movies, unwatchedOnly = true).unwatchedGrouped)
-        assertFalse(LibraryQuery(LibraryKind.Movies, unwatchedOnly = true, favoritesOnly = true).unwatchedGrouped)
-        assertFalse(LibraryQuery(LibraryKind.Movies, unwatchedOnly = true, groupCollections = false).unwatchedGrouped)
-        assertFalse(
-            LibraryQuery(LibraryKind.Movies, unwatchedOnly = true, genreId = java.util.UUID.randomUUID())
-                .unwatchedGrouped,
-        )
-        assertFalse(LibraryQuery(LibraryKind.Shows, unwatchedOnly = true).unwatchedGrouped)
-        assertFalse(LibraryQuery(LibraryKind.Movies).unwatchedGrouped)
+    fun `movies group into collections unless narrowed - unwatched, favorites and genres list the titles themselves`() {
+        // Nixie (TV-S1): unwatched too: the server does not group with a played filter, and the app no longer lists
+        // the whole library to group it itself.
+        assertTrue(LibraryQuery(LibraryKind.Movies).groupsCollections)
+        assertFalse(LibraryQuery(LibraryKind.Movies, unwatchedOnly = true).groupsCollections)
+        assertFalse(LibraryQuery(LibraryKind.Movies, favoritesOnly = true).groupsCollections)
+        assertFalse(LibraryQuery(LibraryKind.Movies, genreId = java.util.UUID.randomUUID()).groupsCollections)
+        assertFalse(LibraryQuery(LibraryKind.Movies, groupCollections = false).groupsCollections)
+        assertFalse(LibraryQuery(LibraryKind.Shows).groupsCollections)
     }
 
     @Test

@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierColors
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalReduceMotion
 import io.github.glacier_jellyfin.androidtv.core.designsystem.startGradient
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.NixieVisuals
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.isActive
@@ -34,7 +36,8 @@ import kotlinx.coroutines.isActive
  */
 @Composable
 fun KenBurns(animate: Boolean = true, content: @Composable () -> Unit) {
-    if (LocalReduceMotion.current) {
+    // Nixie: a still backdrop on boxes with flat glass (NixieVisuals.ambientMotion), as with "reduce motion".
+    if (LocalReduceMotion.current || !NixieVisuals.current.ambientMotion) {
         content()
         return
     }
@@ -68,7 +71,8 @@ private const val KEN_BURNS_MS = 22_000
  * Ground of pages with artwork at the top. The artwork fades into it, so the
  * page stays on this solid colour instead of the accent gradient behind other screens.
  */
-val ImagePageGround = GlacierColors.Void
+// Nixie: read each time, so it follows the theme.
+val ImagePageGround get() = GlacierColors.Void
 
 /**
  * Top backdrop of detail pages: artwork with slow zoom, darkened from the left
@@ -81,6 +85,11 @@ fun DetailBackdrop(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxWidth().height(height.dp).clipToBounds()) {
+        // Nixie: a theme's item backdrop (NixieSlots.item.backdrop), with Glacier's slow zoom on the picture.
+        NixieTheme.slots.item.backdrop?.let { backdrop ->
+            backdrop(url, height) { art, m -> KenBurns { Artwork(art, m) } }
+            return@Box
+        }
         KenBurns { Artwork(url, Modifier.fillMaxSize()) }
         Box(
             Modifier

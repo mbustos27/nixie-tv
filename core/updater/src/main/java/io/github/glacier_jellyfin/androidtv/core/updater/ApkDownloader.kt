@@ -63,7 +63,7 @@ internal class ApkDownloader(private val context: Context) {
         try {
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS
-            connection.setRequestProperty("User-Agent", "Glacier")
+            connection.setRequestProperty("User-Agent", "Nixie") // Nixie: the app's name
             if (connection is HttpURLConnection) {
                 val status = try {
                     connection.responseCode

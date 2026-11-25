@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_skip_described">%1$s. %2$s</string>
+    <string name="nixie_skip_source_server">Marcado en el servidor</string>
+    <string name="nixie_skip_source_chapters">De los capítulos del archivo</string>
+    <string name="nixie_skip_source_online">Buscado en línea</string>
+    <string name="nixie_skip_source_learned">Aprendido de lo que saltaste en esta temporada</string>
+    <string name="nixie_settings_lookup_online">Buscar saltos en línea</string>
+    <string name="nixie_settings_lookup_online_sub">Cuando el servidor y los capítulos no tienen ninguno. Solo envía el id público de la serie, el número de temporada y de episodio, y la duración del episodio a TheIntroDB y, para anime, a AniSkip (ARM solo recibe el id de la serie, para encontrarla allí)</string>
+    <string name="nixie_settings_learn_skips">Aprender saltos</string>
+    <string name="nixie_settings_learn_skips_sub">Salta una introducción a mano y los episodios siguientes de la temporada ofrecen Saltar intro, salvo que la intro cambie de sitio</string>
+    <string name="nixie_settings_forget_learned">Olvidar los saltos aprendidos</string>
+    <string name="nixie_settings_forget_learned_sub">Borra lo que este dispositivo aprendió de tus saltos</string>
+    <string name="nixie_settings_forget">Olvidar</string>
+    <string name="nixie_learned_forgotten">Saltos aprendidos olvidados</string>
+    <string name="nixie_up_next">A continuación</string>
+    <string name="nixie_episode_code">T%1$d E%2$d</string>
+    <string name="nixie_episode_code_range">T%1$d E%2$d–%3$d</string>
+    <string name="nixie_play_resume_episode">Continuar %1$s</string>
+    <string name="nixie_play_episode">Reproducir %1$s</string>
+    <string name="nixie_play_from_start">Reproducir desde el principio</string>
+    <string name="nixie_search_all">Todo</string>
+    <string name="nixie_search_shows">Series</string>
+    <string name="nixie_search_movies">Películas</string>
+    <string name="nixie_search_episodes">Episodios</string>
+    <string name="nixie_search_collections">Colecciones</string>
+    <string name="nixie_search_albums">Álbumes</string>
+    <string name="nixie_search_people">Personas</string>
+    <string name="nixie_search_person">Persona</string>
+    <string name="nixie_search_show_more">Mostrar %1$d más</string>
+</resources>

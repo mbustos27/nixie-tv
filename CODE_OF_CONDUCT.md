@@ -60,11 +60,11 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement. There is no
-public e-mail address for this project. To report privately, use the contact
-details on the GitHub profile of the
-[Glacier-Jellyfin](https://github.com/Glacier-Jellyfin) organisation, or open a
-minimal issue that only asks for a private contact, without any details of what
-happened. The maintainer will then get in touch with you privately.
+public e-mail address for this project. To report privately, open a minimal
+issue that only asks for a private contact, without any details of what
+happened. The maintainer of Nixie for TV
+([mbustos27](https://github.com/mbustos27)) will then get in touch with you
+privately.
 
 All complaints will be reviewed and investigated promptly and fairly.
 

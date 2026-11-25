@@ -1,26 +1,93 @@
 # Changelog
 
-All notable changes to Glacier are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
-the scheme described in [docs/RELEASING.md](docs/RELEASING.md).
+All notable changes to Nixie for TV are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow the scheme described in
+[docs/RELEASING.md](docs/RELEASING.md).
 
-Each version section is published verbatim as the GitHub release notes and
-shown in the app's update dialog. Use these subsections, in this order, and
-omit empty ones:
+Each version's section is published verbatim as its GitHub release's notes, which the app's update dialog shows. The
+dialog shows only `###` headings and `-` lists (a plain paragraph shows on GitHub alone), so write everything as list
+items. Start with `### Install` (the short link: people come to a release page to install), then these subsections, in
+this order, omitting empty ones:
 
 - `### New`
 - `### Improved`
 - `### Fixed`
 - `### Known issues`
 
-Reference issues or pull requests at the end of a line as `(#123)`; the app
-renders the reference separately.
+Reference issues or pull requests at the end of a line as `(#123)`; the app renders the reference separately.
 
-[CHANGELOG.de.md](CHANGELOG.de.md) and [CHANGELOG.es.md](CHANGELOG.es.md) hold
-the same sections in German and Spanish. The release notes carry each in a
-collapsed block, and the app shows it when its language is German or Spanish.
+Nixie's notes are in English only: [CHANGELOG.de.md](CHANGELOG.de.md) and [CHANGELOG.es.md](CHANGELOG.es.md) hold no
+versions.
+
+Nixie for TV is based on [Glacier](https://github.com/Glacier-Jellyfin/glacier-androidtv) 0.10.1. Below Nixie's own
+versions, Glacier's release notes up to that version are kept as the base.
 
 ## [Unreleased]
+
+## [1.0.0] - <release date>
+
+### Install
+- On the TV: type `<is.gd link>` into Downloader or a similar downloader app, or enter the Downloader code
+  `<Downloader code>`. Android asks once to let that app install apps
+- Or download `Nixie-TV-1.0.0.apk` below and install it with a file manager on the box, or from a computer with
+  `adb install Nixie-TV-1.0.0.apk`. `Nixie-TV-1.0.0.apk.sha256` is its checksum (SECURITY.md shows how to compare)
+- You need Android TV or Google TV, Android 9 or newer, on an ARM box (32- or 64-bit), and an account on a Jellyfin
+  server, version 12.0 or newer
+- Nixie for TV installs beside Glacier and doesn't share its settings. It is not in an app store
+
+### What Nixie for TV is
+- A free, open-source Jellyfin app for Android TV and Google TV: Nixie's themes on the big screen, with a player built
+  for the remote. It is the TV sibling of Nixie for Windows
+- It is based on Glacier, by Glacier's authors, under the GPL-3.0: Glacier brings sign-in, libraries, item pages,
+  search, the player, profiles, music, photos and live TV. Please report problems in Nixie for TV here, not to
+  Glacier's authors: they can't fix Nixie
+- No account, analytics, ads or telemetry. PRIVACY.md lists everything that leaves the box, and to where
+
+### New
+- Three themes, switched at once in Settings › Appearance › Theme, keeping your place: Drive-in, the default (a
+  desert-sunset palette, warm glass, a two-tone neon focus ring and nixie tubes for numbers), Cinematic (a night-dark
+  page and a white-rimmed focus frame in a wide glow) and Editorial (an ink page, serif headings and a printer's
+  double rule for focus)
+- Home is Continue watching, then Up next. Collections has its own place in the top bar, sorted A to Z or Z to A
+- Big libraries open fast: the first page shows while the rest loads, and the A–Z rail jumps without reading the whole
+  library first
+- Search shows each kind of result as it arrives
+- Playback on the box's own decoders: 4K, HDR10 and Dolby Vision where the TV shows them, DTS and TrueHD decoded in the
+  app when the box can't, styled ASS subtitles, trickplay, frame-rate matching and the next-episode countdown
+- The player lets go in standby and comes back paused where you were
+- Skips for intros and credits: from the server, from the file's chapters, and learned from what you skip by hand.
+  Looking them up online stays off until you turn it on in Settings › Playback
+- Continue watching: hold OK on a title to remove it, with Undo for 10 seconds. The same row can show on the TV's home
+  screen where the home screen supports it (Settings › Home turns it off)
+- Trailers from the server, or from YouTube
+- Quick Connect first when the server offers it, a password otherwise; profiles with PINs and age limits; a saved
+  server can be removed from the TV (hold OK on its card, or press Menu)
+- Your Nixie settings follow you: each profile keeps a copy on the server, so they come back after a reinstall or on
+  another TV
+- Music, photos, live TV with a guide, and requests where the server offers Seerr
+- Report a problem (Settings › System › Diagnostics) shows a code that opens this repository's issue form on a phone,
+  with the app's and the server's versions filled in. Download log on the network hands the log to a phone on the
+  same network, with server addresses and names, signed-in users' names, passwords and tokens taken out
+- Updates from this repository's releases: Nixie checks at every start (Settings › System turns it off), shows the
+  notes, and installs only when you choose Update now, after checking the download's SHA-256, package and version
+- English, German and Spanish, following the TV's language
+
+### Tested
+- Every release passes the basics gate first: on an emulator, with the remote's keys, against throwaway test servers
+  (never anyone's own), in all three themes. Quick Connect and password sign-ins across a restart and a force-stop,
+  sign-out, a second user, profiles and PINs, a second server added, switched and removed, every menu and dialog,
+  every row to its last card, Back, the top bar, and text that fits. A failed check stops the release
+
+### Known issues
+- Google TV's own home screen doesn't show Nixie's Continue watching row: it leaves out apps Google hasn't verified.
+  Other home screens and launchers that show Android's Watch Next row do
+- Not for Fire TV yet: a Fire TV build comes later, from this repository
+
+## [Glacier's releases]
+
+- Nixie for TV 1.0.0 is based on Glacier 0.10.1. The sections below are Glacier's own release notes, up to that
+  version; Glacier's later ones are in
+  [Glacier's changelog](https://github.com/Glacier-Jellyfin/glacier-androidtv/blob/main/CHANGELOG.md)
 
 ## [0.10.1] - 2026-11-18
 

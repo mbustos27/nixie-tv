@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: one nixie tube with a glowing N, inside the 66 dp safe zone. Own artwork. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1AFFF4EE"
+        android:strokeColor="#66F7AA9C"
+        android:strokeWidth="1"
+        android:pathData="M40,42 A14,14 0 0,1 68,42 V73 Q68,76 65,76 H43 Q40,76 40,73 Z" />
+    <path
+        android:fillColor="#FF500723"
+        android:pathData="M38,76 h32 v5 a1.5,1.5 0 0,1 -1.5,1.5 h-29 a1.5,1.5 0 0,1 -1.5,-1.5 z" />
+    <path
+        android:strokeColor="#2EFF7A50"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M47,69 V40 L61,69 V40" />
+    <path
+        android:strokeColor="#66FF7A50"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M47,69 V40 L61,69 V40" />
+    <path
+        android:strokeColor="#FFFF7A50"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M47,69 V40 L61,69 V40" />
+    <path
+        android:strokeColor="#FFFFE3D2"
+        android:strokeWidth="1.1"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M47,69 V40 L61,69 V40" />
+</vector>

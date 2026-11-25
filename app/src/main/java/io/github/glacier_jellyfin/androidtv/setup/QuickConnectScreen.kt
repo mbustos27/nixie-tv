@@ -44,6 +44,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 import java.util.Locale
 
 @Composable
@@ -87,7 +88,8 @@ fun QuickConnectScreen(
                 color = GlacierColors.Mist,
                 modifier = Modifier.padding(start = 4.dp),
             )
-            CodeDigits(state.code)
+            // Nixie: a theme's own code display (Drive-in: nixie tubes).
+            NixieTheme.slots.quickConnectCode?.invoke(state.code, CODE_LENGTH) ?: CodeDigits(state.code)
             Validity(state.secondsLeft)
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 SetupButton(

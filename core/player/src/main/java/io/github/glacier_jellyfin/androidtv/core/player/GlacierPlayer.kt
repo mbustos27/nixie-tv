@@ -501,9 +501,7 @@ class GlacierPlayback(
                 eventTime: AnalyticsListener.EventTime,
                 playoutStartSystemTimeMs: Long,
             ) {
-                audioStart(
-                    "position advancing, playout start ${playoutStartSystemTimeMs - SystemClock.elapsedRealtime()} ms from now (system time)",
-                )
+                audioStart(playoutLine(playoutStartSystemTimeMs))
             }
 
             override fun onAudioUnderrun(
@@ -571,6 +569,14 @@ class GlacierPlayback(
 
         /** Less than this past the plan counts as the plan: no jump inside the stream that is handed over to. */
         private const val MIN_SKIP_MS = 250L
+
+        /**
+         * Nixie (tv-1.0-fixes): the audio start timeline's line for Media3's `onAudioPositionAdvancing`, whose playout
+         * start is wall-clock time (`System.currentTimeMillis()`). Taken from the time since boot it read "1795504692386
+         * ms from now", about 57 years, on every playback; it is how long ago the sound started, a few ms.
+         */
+        fun playoutLine(playoutStartSystemTimeMs: Long, nowMs: Long = System.currentTimeMillis()): String =
+            "position advancing, playout started ${nowMs - playoutStartSystemTimeMs} ms ago"
 
         /** "E-AC-3 bitstream", "PCM 16-bit": whether the receiver gets the bitstream or decoded sound. */
         fun encodingName(encoding: Int): String = when (encoding) {

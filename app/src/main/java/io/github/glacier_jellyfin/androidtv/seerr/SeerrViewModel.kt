@@ -68,7 +68,7 @@ class SeerrViewModel @Inject constructor(savedStateHandle: SavedStateHandle, pri
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Loading $type ${route.tmdbId} failed", e)
+                Log.w(TAG, "Loading a $type failed", e) // Nixie (tv-1.0-privacy): no TMDB id, it names the title
                 _state.update { it.copy(failed = true) }
             }
         }
@@ -108,7 +108,7 @@ class SeerrViewModel @Inject constructor(savedStateHandle: SavedStateHandle, pri
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Request for $type ${route.tmdbId} failed", e)
+                Log.w(TAG, "Request for a $type failed", e) // Nixie (tv-1.0-privacy): no TMDB id
                 SeerrRequestResult.Failed
             }
             _state.update { it.copy(sending = false) }

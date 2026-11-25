@@ -62,6 +62,12 @@ import io.github.glacier_jellyfin.androidtv.ui.LocalCardSizes
 import io.github.glacier_jellyfin.androidtv.ui.PosterCard
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.data.search.SearchKind
+import io.github.mbustos27.nixie.tv.library.nixieListEnd
+import io.github.mbustos27.nixie.tv.play.SearchChips
+import io.github.mbustos27.nixie.tv.play.ShowMoreCard
+import io.github.mbustos27.nixie.tv.play.searchCaption
+import io.github.mbustos27.nixie.tv.search.KeepBestInView
 
 /** Design keypad: six columns of letters and digits, then keyboard, space and delete. */
 private val KeypadRows = listOf("ABCDEF", "GHIJKL", "MNOPQR", "STUVWX", "YZ0123", "456789")
@@ -69,6 +75,9 @@ private const val KeyWidth = 94
 private const val KeyHeight = 76
 private const val KeyGap = 12
 private const val Columns = 4
+
+// Nixie: the "Show N more" card's key in the results grid.
+private const val SHOW_MORE_KEY = "nixie-show-more"
 
 @Composable
 fun SearchScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SearchViewModel = hiltViewModel()) {
@@ -106,6 +115,8 @@ fun SearchScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SearchViewMo
     var inInput by remember { mutableStateOf(false) }
     BackHandler(enabled = inResults) { runCatching { keyFocus.requestFocus() } }
     BackHandler(enabled = inInput) { runCatching { navFocus.requestFocus() } }
+    // Nixie (TV-S4, review): a better match that arrives late shows at the top, unless the focus is in the grid.
+    KeepBestInView(gridState, state.results.firstOrNull()?.resultKey, focusInGrid = { inResults })
 
     Box(Modifier.fillMaxSize()) {
         Row(
@@ -156,6 +167,8 @@ fun SearchScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SearchViewMo
                     viewModel.open(item)
                 },
                 onRetry = viewModel::retry,
+                onPickChip = viewModel::pickChip, // Nixie: type chips and "Show N more"
+                onShowMore = viewModel::showMore,
                 modifier = Modifier.weight(1f).onFocusChanged { inResults = it.hasFocus },
             )
         }
@@ -174,9 +187,10 @@ fun SearchScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SearchViewMo
         text = state.query,
         onTextChange = viewModel::setQuery,
         open = systemKeyboard,
-        onClose = {
+        onClose = { done ->
             systemKeyboard = false
             (if (openedFromField) fieldFocus else keyFocus).requestFocus()
+            if (done) viewModel.searchNow() // Nixie (TV-S4, review): Enter searches at once, one character too
         },
     )
 }
@@ -255,7 +269,19 @@ private fun Results(
     onOpenSeerr: (SeerrItem) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier,
+    // Nixie: type chips and "Show N more".
+    onPickChip: (SearchKind?) -> Unit = {},
+    onShowMore: () -> Unit = {},
 ) {
+    // Nixie: after "Show N more", focus goes to the first title it showed.
+    val reveal = remember { FocusRequester() }
+    var revealKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(revealKey, state.results) {
+        if (revealKey == null || state.results.none { it.resultKey == revealKey }) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { reveal.requestFocus() }
+        revealKey = null
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(22.dp)) {
         val count = state.results.size + state.seerr.size
         val title = when {
@@ -269,6 +295,7 @@ private fun Results(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        SearchChips(state.ranked?.chips.orEmpty(), state.chip, onPickChip) // Nixie: "All", "Shows", "Movies" …
         when {
             state.failed -> Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
                 Text(stringResource(R.string.search_error), style = GlacierText.body(21), color = GlacierColors.Mist)
@@ -297,11 +324,37 @@ private fun Results(
                 modifier = Modifier.width((LocalCardSizes.current.posterWidth * Columns + 26 * (Columns - 1) + 24).dp),
             ) {
                 fun Modifier.restoring(key: String) = if (key == lastOpened) focusRequester(restoreFocus) else this
+
+                // Nixie (tv-gate-b): the grid's last card (a short last row's) keeps the focus on Right (nixieListEnd).
+                val seerrShown = state.seerr.takeIf { state.chip == null }.orEmpty()
+                val lastKey = seerrShown.lastOrNull()?.resultKey
+                    ?: if (state.hidden > 0) SHOW_MORE_KEY else state.results.lastOrNull()?.resultKey
+                fun Modifier.ending(key: String) = nixieListEnd(key == lastKey, rail = null)
                 items(state.results, key = { it.resultKey }) { item ->
-                    ResultCard(item, onClick = { onOpen(item) }, modifier = Modifier.restoring(item.resultKey))
+                    // Nixie: the first title "Show N more" showed takes the focus.
+                    val revealing = if (item.resultKey == revealKey) Modifier.focusRequester(reveal) else Modifier
+                    ResultCard(
+                        item,
+                        onClick = { onOpen(item) },
+                        modifier = Modifier.restoring(item.resultKey).then(revealing).ending(item.resultKey),
+                    )
                 }
-                items(state.seerr, key = { it.resultKey }) { item ->
-                    SeerrCard(item, onClick = { onOpenSeerr(item) }, modifier = Modifier.restoring(item.resultKey))
+                // Nixie: weaker matches wait behind "Show N more"; Seerr's titles show under "All" only.
+                if (state.hidden > 0) {
+                    item(key = SHOW_MORE_KEY) {
+                        ShowMoreCard(state.hidden, modifier = Modifier.ending(SHOW_MORE_KEY), onClick = {
+                            val all = state.ranked?.visible(state.chip, expanded = true).orEmpty()
+                            revealKey = all.getOrNull(state.results.size)?.resultKey
+                            onShowMore()
+                        })
+                    }
+                }
+                items(seerrShown, key = { it.resultKey }) { item ->
+                    SeerrCard(
+                        item,
+                        onClick = { onOpenSeerr(item) },
+                        modifier = Modifier.restoring(item.resultKey).ending(item.resultKey),
+                    )
                 }
             }
         }
@@ -328,7 +381,8 @@ private fun ResultCard(
         // Title above the year, laid out like the album cards.
         PosterCard(
             imageUrl = item.posterUrl,
-            caption = yearText(item).orEmpty(),
+            // Nixie: a person says so, an episode names its show and SxEy.
+            caption = searchCaption(item) ?: yearText(item).orEmpty(),
             onClick = onClick,
             modifier = modifier,
             title = item.title,

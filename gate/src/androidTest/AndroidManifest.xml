@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The gate approves Quick Connect codes on the throwaway test Jellyfin (loopback on the PC, 10.0.2.2 from the
+     emulator), as a signed-in phone would: plain HTTP to that address only. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:usesCleartextTraffic="true" />
+</manifest>

@@ -28,12 +28,14 @@ class AnonymizerTest {
 
     @Test
     fun `replaces a host before a user name inside it`() {
-        assertEquals("https://server-1 for user-2", anonymizer.apply("https://jf.example.org for example"))
+        assertEquals("https://server-1 for user-3", anonymizer.apply("https://jf.example.org for example"))
     }
 
+    // Nixie (tv-1.0-privacy): a short name goes too, in a name field only (in free text it would take ordinary words).
     @Test
-    fun `leaves short names and the default server name alone`() {
-        assertEquals("Al plays on Jellyfin 12.1", anonymizer.apply("Al plays on Jellyfin 12.1"))
+    fun `replaces short names in name fields, leaves the default server name alone`() {
+        val out = anonymizer.apply("user=Al plays on Jellyfin 12.1, Al dente")
+        assertEquals("user=user-2 plays on Jellyfin 12.1, Al dente", out)
     }
 
     @Test

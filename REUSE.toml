@@ -1,6 +1,7 @@
 version = 1
-SPDX-PackageName = "Glacier"
-SPDX-PackageDownloadLocation = "https://github.com/Glacier-Jellyfin/glacier-androidtv"
+# Nixie: this repository is Nixie for TV, based on Glacier (https://github.com/Glacier-Jellyfin/glacier-androidtv).
+SPDX-PackageName = "Nixie for TV"
+SPDX-PackageDownloadLocation = "https://github.com/mbustos27/nixie-tv"
 
 # Everything that is not listed below is Glacier's own work.
 [[annotations]]
@@ -31,18 +32,6 @@ precedence = "override"
 SPDX-FileCopyrightText = "2025 The Google Sans Project Authors (https://github.com/googlefonts/googlesans)"
 SPDX-License-Identifier = "OFL-1.1"
 
-[[annotations]]
-path = ["website/assets/fonts/bricolage-grotesque-*.woff2", "website/assets/fonts/OFL-bricolage-grotesque.txt"]
-precedence = "override"
-SPDX-FileCopyrightText = "2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)"
-SPDX-License-Identifier = "OFL-1.1"
-
-[[annotations]]
-path = ["website/assets/fonts/caveat-*.woff2", "website/assets/fonts/OFL-caveat.txt"]
-precedence = "override"
-SPDX-FileCopyrightText = "2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)"
-SPDX-License-Identifier = "OFL-1.1"
-
 # Language flags (flag-icon-css, see the LICENSE next to them).
 [[annotations]]
 path = "app/src/main/assets/flags/**"
@@ -63,3 +52,51 @@ path = "core/player/src/test/resources/dolby-vision/*.hevc"
 precedence = "override"
 SPDX-FileCopyrightText = ["Glacier contributors", "quietvoid"]
 SPDX-License-Identifier = "GPL-3.0-or-later AND MIT"
+
+# Nixie: Nixie for TV's own files (the fork's changes inside Glacier's files carry both lines through the first entry).
+[[annotations]]
+path = [
+    "core/designsystem/src/main/java/io/github/mbustos27/**",
+    "theme/**",
+    "app/src/main/java/io/github/mbustos27/**",
+    "app/src/test/java/io/github/mbustos27/**",
+    "app/src/main/res/values*/nixie_strings.xml",
+    "app/src/nixie/**",
+    "tools/release-check/**",
+    "testing/**",
+    "baselineprofile/**",
+    "gate/**",
+    "tools/gate/**",
+    "docs/PHASE0-OWNER.md",
+    "docs/THEMES.md",
+    "docs/GLACIER-BASE.md",
+    "DIVERGENCE.md",
+    ".github/ISSUE_TEMPLATE/bug.yml",
+    ".github/ISSUE_TEMPLATE/feature.yml",
+    "PRIVACY.md",
+    "docs/PUBLISH-CHECKLIST.md",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Nixie contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Nixie: files that began as copies of Glacier's and were changed for Nixie keep Glacier's copyright beside Nixie's
+# (after the entry above, so this one decides for them): the rebrand's strings (Glacier's strings, renamed and
+# translated), the theme modules' screen stand-ins (copied from the app's layout around each hook), and the public
+# repository's pages rewritten for Nixie in place of Glacier's.
+[[annotations]]
+path = [
+    "app/src/nixie/res/values*/strings.xml",
+    "theme/*/src/test/java/io/github/mbustos27/nixie/tv/theme/*/StandIns.kt",
+    "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CHANGELOG.de.md",
+    "CHANGELOG.es.md",
+    "scripts/README.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/ISSUE_TEMPLATE/config.yml",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["Glacier contributors", "2026 Nixie contributors"]
+SPDX-License-Identifier = "GPL-3.0-or-later"

@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import coil3.BitmapImage
 import coil3.compose.AsyncImage
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierCard
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierColors
@@ -51,6 +53,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.core.designsystem.focusFrame
 import io.github.glacier_jellyfin.androidtv.core.designsystem.startGradient
 import io.github.glacier_jellyfin.androidtv.parental.LockBadge
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 import kotlinx.coroutines.delay
 
 /** Card sizes of the design's two row densities (Settings › Appearance). */
@@ -102,12 +105,19 @@ object CardSize {
 @Composable
 fun Artwork(url: String?, modifier: Modifier = Modifier) {
     val accent = LocalAccent.current
-    Box(modifier.background(Brush.linearGradient(listOf(accent.deep.copy(alpha = 0.45f), GlacierColors.Deep)))) {
+    // Nixie (TV-S2): one fill per colour pair, not one per card each time it is composed.
+    val deep = accent.deep
+    val ground = GlacierColors.Deep
+    val fill = remember(deep, ground) { Brush.linearGradient(listOf(deep.copy(alpha = 0.45f), ground)) }
+    // Nixie (TV-S2): an opaque picture covers the fill, so it is not drawn under it in every frame of a scroll.
+    var covered by remember(url) { mutableStateOf(false) }
+    Box(modifier.drawBehind { if (!covered) drawRect(fill) }) {
         if (url != null) {
             var attempt by remember(url) { mutableIntStateOf(0) }
             var failed by remember(url) { mutableStateOf(false) }
-            LaunchedEffect(failed) {
-                if (failed && attempt < ARTWORK_RETRIES) {
+            // Nixie (TV-S2): the retry's coroutine only after a failure, not one for every card composed.
+            if (failed && attempt < ARTWORK_RETRIES) {
+                LaunchedEffect(attempt) {
                     delay(ARTWORK_RETRY_DELAY_MS)
                     attempt++
                     failed = false
@@ -118,6 +128,7 @@ fun Artwork(url: String?, modifier: Modifier = Modifier) {
                     model = url,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    onSuccess = { covered = (it.result.image as? BitmapImage)?.bitmap?.hasAlpha() == false },
                     onError = { failed = true },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -128,6 +139,14 @@ fun Artwork(url: String?, modifier: Modifier = Modifier) {
 
 private const val ARTWORK_RETRIES = 1
 private const val ARTWORK_RETRY_DELAY_MS = 800L
+
+/** Nixie (TV-S2): the grid card's soft sheen from the top right (linear-gradient 200deg in the design), made once. */
+private val CardSheen = Brush.linearGradient(
+    0f to Color(0x1AE8F4F7),
+    0.42f to Color.Transparent,
+    start = Offset(Float.POSITIVE_INFINITY, 0f),
+    end = Offset(0f, Float.POSITIVE_INFINITY),
+)
 
 /**
  * "Continue watching": 16:9 still, progress bar, play button on focus, title and time left.
@@ -153,6 +172,29 @@ fun ContinueCard(
         modifier = modifier.width(sizes.continueWidth.dp),
         onLongClick = onLongClick,
     ) { focused ->
+        // Nixie: a theme's own still (Cinematic: the title over the art), in Glacier's frame and with its marks.
+        val still = NixieTheme.slots.stillCard
+        if (still != null) {
+            Box(
+                Modifier
+                    .size(sizes.continueWidth.dp, (imageHeight ?: sizes.continueHeight).dp)
+                    .focusFrame(focused, shape)
+                    .clip(shape),
+            ) {
+                still(imageUrl, title, subtitle, progress, focused) { url, artModifier -> Artwork(url, artModifier) }
+                if (locked) LockBadge(Modifier.align(Alignment.TopStart))
+                if (onLongClick != null) {
+                    HoldOkMark(
+                        focused,
+                        accent,
+                        Modifier.align(Alignment.TopEnd).padding(14.dp),
+                        size = 34,
+                        onPicture = true,
+                    )
+                }
+            }
+            return@GlacierCard
+        }
         Box(
             Modifier
                 .size(sizes.continueWidth.dp, (imageHeight ?: sizes.continueHeight).dp)
@@ -254,7 +296,13 @@ fun PosterCard(
                 .focusFrame(focused, shape)
                 .clip(shape),
         ) {
-            Artwork(imageUrl, Modifier.fillMaxSize())
+            // Nixie: a theme's poster art (NixieSlots.browse.posterArt).
+            val art = NixieTheme.slots.browse.posterArt
+            if (art != null) {
+                art(imageUrl, focused) { url, m -> Artwork(url, m) }
+            } else {
+                Artwork(imageUrl, Modifier.fillMaxSize())
+            }
             // Soft sheen from the top right (linear-gradient 200deg in the design).
             Box(
                 Modifier
@@ -426,7 +474,13 @@ fun GridCard(
                 .focusFrame(focused, outline)
                 .clip(outline),
         ) {
-            Artwork(imageUrl, Modifier.fillMaxSize())
+            // Nixie: a theme's poster art (NixieSlots.browse.posterArt).
+            val art = NixieTheme.slots.browse.posterArt
+            if (art != null) {
+                art(imageUrl, focused) { url, m -> Artwork(url, m) }
+            } else {
+                Artwork(imageUrl, Modifier.fillMaxSize())
+            }
             if (imageUrl == null) {
                 // No artwork (genres, some collections): the title stands in for it.
                 Text(
@@ -438,18 +492,8 @@ fun GridCard(
                     modifier = Modifier.align(Alignment.Center).padding(20.dp),
                 )
             }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            0f to Color(0x1AE8F4F7),
-                            0.42f to Color.Transparent,
-                            start = Offset(Float.POSITIVE_INFINITY, 0f),
-                            end = Offset(0f, Float.POSITIVE_INFINITY),
-                        ),
-                    ),
-            )
+            // Nixie (TV-S2): the same sheen object every time, so a card composed again leaves its drawing as it was.
+            Box(Modifier.fillMaxSize().background(CardSheen))
             if (locked) LockBadge(Modifier.align(Alignment.TopStart))
             when {
                 // With options, the mark in the corner says that holding OK opens them.

@@ -22,6 +22,8 @@ import androidx.tv.material3.Text
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierColors
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.rememberCardPivotSpec
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.library.nixieRowWithEnd
 
 /** Left and right page margin of rows. */
 const val PageEdge = 80
@@ -37,6 +39,8 @@ fun MediaRow(
     bottomPadding: Int? = null,
     gap: Int = LocalCardSizes.current.rowGap,
     state: LazyListState = rememberLazyListState(),
+    // Nixie: the row's position on its page, from 0, for a theme's numbered headers (NixieSlots.rowHeaderAt).
+    index: Int? = null,
     content: LazyListScope.() -> Unit,
 ) {
     // The row's 26px vertical content padding leaves room for focus scale and ring;
@@ -47,7 +51,14 @@ fun MediaRow(
             bottom = ((bottomPadding ?: LocalCardSizes.current.rowBottom) - 26).coerceAtLeast(0).dp,
         ),
     ) {
-        if (title != null) {
+        // Nixie: a theme's own row header (Drive-in: a marquee; Editorial: numbered where the page gives the index).
+        val headerAt = NixieTheme.slots.rowHeaderAt.takeIf { index != null }
+        val header = NixieTheme.slots.rowHeader
+        if (title != null && headerAt != null && index != null) {
+            headerAt(index, title, subtitle, Modifier.padding(start = PageEdge.dp, end = PageEdge.dp))
+        } else if (title != null && header != null) {
+            header(title, subtitle, Modifier.padding(start = PageEdge.dp, end = PageEdge.dp))
+        } else if (title != null) {
             Row(
                 Modifier.padding(start = PageEdge.dp, end = PageEdge.dp),
                 verticalAlignment = Alignment.Bottom,
@@ -76,7 +87,8 @@ fun MediaRow(
                 horizontalArrangement = Arrangement.spacedBy(gap.dp),
                 state = state,
                 modifier = Modifier.offset(y = (-8).dp),
-                content = content,
+                // Nixie (tv-gate-b): Right on the row's last card stays there (NixieRowEnd.kt).
+                content = { nixieRowWithEnd(this, content) },
             )
         }
     }

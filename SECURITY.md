@@ -2,41 +2,40 @@
 
 ## Reporting a vulnerability
 
-Please do not open a public issue for security problems. Report them
-privately instead. Use this link:
-https://github.com/Glacier-Jellyfin/glacier-androidtv/security/advisories/new
+Please don't report a security problem in a public issue. Report it privately through GitHub's private vulnerability
+reporting: **[Report a vulnerability](https://github.com/mbustos27/nixie-tv/security/advisories/new)** (the Security
+tab of this repository). Only the maintainer sees the report, and the conversation stays private until a fix is out.
+There is no e-mail address for reports.
 
-You can also open the repository's **Security** tab and choose
-**Report a vulnerability**.
+Please include:
 
-Reports usually get an answer within a few days. Glacier is a hobby project,
-so there is no fixed deadline for a fix. Reports are disclosed together with
-the fix.
+- the Nixie for TV version (Settings › System) and the box with its Android version;
+- what someone could do, and how: the steps, or a proof of concept;
+- what you think would fix it, if you know.
+
+Leave out any server address, user name, password or token, also from logs and screenshots.
+
+Nixie for TV is based on Glacier. A problem in code the two share may affect Glacier too, but please don't send
+problems you found in Nixie to Glacier's maintainers: they can't fix Nixie. If you believe Glacier is affected as
+well, say so in your report.
 
 ## Supported versions
 
-Only the newest release receives fixes. Glacier updates itself, so a fix
-reaches everyone with the next release.
+Only the newest release receives fixes.
 
 ## Verifying a download
 
-Every release APK is built by the `Release` workflow from the tagged sources
-and carries a signed build provenance attestation. With the GitHub CLI:
+Each release is one APK, `Nixie-TV-<version>.apk`, published with its SHA-256 in `Nixie-TV-<version>.apk.sha256`.
+Compare the two before installing by hand:
 
-```sh
-gh attestation verify glacier-androidtv.apk --repo Glacier-Jellyfin/glacier-androidtv
+```powershell
+(Get-FileHash Nixie-TV-1.0.0.apk -Algorithm SHA256).Hash.ToLower()
+Get-Content Nixie-TV-1.0.0.apk.sha256
 ```
 
-The same attestation is attached to each release as
-`glacier-androidtv.apk.intoto.jsonl`. Download it next to the APK to verify
-offline:
-
 ```sh
-gh attestation verify glacier-androidtv.apk \
-  --bundle glacier-androidtv.apk.intoto.jsonl \
-  --repo Glacier-Jellyfin/glacier-androidtv
+sha256sum -c Nixie-TV-1.0.0.apk.sha256
 ```
 
-The in-app updater checks the SHA-256 digest GitHub publishes for the file,
-the package name and the version before installing. Android then refuses any
-update that is not signed with the same key as the installed app.
+The in-app updater checks the SHA-256 digest GitHub publishes for the file, the package name and the version before
+installing. Android then refuses any update that isn't signed with the same key as the installed app.

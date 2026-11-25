@@ -71,12 +71,16 @@ data class MediaItem(
     val backdropUrl: String?,
     /** Above the profile's age limit: opens only with the PIN (set by [AgeFilter]). */
     val ageLocked: Boolean = false,
+    // Nixie: the last episode in a file that holds several ("S1 E4–5"); null for one episode.
+    val episodeNumberEnd: Int? = null,
 )
 
 /** Everything the home screen shows, loaded in one go. */
 data class HomeContent(
     val libraries: List<Library>,
     val continueWatching: List<MediaItem>,
+    /** Nixie: next episodes of shows not in [continueWatching], one per show (ContinueWatchingRules). */
+    val upNext: List<MediaItem> = emptyList(),
     val latest: List<Pair<Library, List<MediaItem>>>,
     /** Favorite movies and shows, newest first. */
     val favorites: List<MediaItem> = emptyList(),

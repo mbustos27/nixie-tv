@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: Glacier contributors -->
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="setup_unsupported_body">%1$s usa Jellyfin %2$s. Nixie es compatible con Jellyfin 12.0 o posterior. Puede que algunas funciones no vayan.</string>
+    <string name="profiles_server_line">%1$s · Jellyfin %2$s · Nixie %3$s</string>
+    <string name="home_exit_title">¿Salir de Nixie?</string>
+    <string name="address_hint">Nixie prueba primero HTTPS y luego HTTP, cada uno en el puerto estándar y en %1$s. Para otro puerto, añade %2$s.</string>
+    <string name="settings_accent_sub">Nueve acentos de Nixie por todo el arcoíris. También tiñen el degradado del fondo.</string>
+    <string name="settings_hd_audio_sub">Cómo llega el sonido sin pérdida al receptor. Nixie envía el stream completo, también donde Android solo envía el núcleo DTS. Con E-AC-3, el servidor convierte además lo que no puede salir como bitstream. Sin Atmos, pero con sonido envolvente donde el dispositivo solo envía PCM en estéreo</string>
+    <string name="settings_hd_audio_glacier">Nixie</string>
+    <string name="settings_sub_style_custom_sub">Nixie dibuja los subtítulos con los ajustes de abajo</string>
+    <string name="settings_sub_font_sub">Predeterminado usa la letra de Nixie</string>
+    <string name="settings_start_picker_sub">Pregunta quién está viendo cada vez que se inicia Nixie</string>
+    <string name="update_downloading_sub">Mientras tanto puedes seguir usando Nixie</string>
+    <string name="update_ready_sub">Nixie se cierra para instalarla · la primera vez, Android pide permiso para instalar apps desde Nixie</string>
+    <string name="update_current">Nixie está actualizado</string>
+    <string name="update_unsupported_sub">La versión %1$s no es una versión publicada de Nixie</string>
+    <string name="update_error_package">La descarga no es la versión de Nixie que anunció la publicación</string>
+    <string name="update_bar_version">Nixie %1$s</string>
+    <string name="diag_send_crash_sub">Nixie se cerró de forma inesperada el %1$s. Envía el registro para que se pueda encontrar el error.</string>
+    <string name="check_intro_body">Nixie reproduce %1$d archivos de prueba cortos para ver qué formatos de imagen y sonido admiten este dispositivo y tu televisor o equipo de sonido. El televisor puede cambiar de modo de imagen y el equipo de sonido puede mostrar otros formatos. Tus ajustes no cambian.</string>
+    <string name="diag_crash_notice">Nixie se cerró de forma inesperada. Envía el registro en Ajustes › Sistema</string>
+    <string name="diag_crash_title">Nixie se cerró de forma inesperada</string>
+    <string name="update_title">Nixie %1$s</string>
+    <string name="update_hint">↑↓ desplaza las notas de la versión · Nixie se cierra para instalarla · más tarde cuando quieras en Ajustes › Sistema</string>
+    <string name="update_installing_title">Instalando Nixie %1$s …</string>
+    <string name="update_installing_hint">Mientras tanto Nixie se cierra y después se abre como siempre</string>
+    <string name="update_downloading_title">Descargando Nixie %1$s …</string>
+    <string name="update_downloading_hint">Nixie instala la actualización justo después. Atrás cancela la descarga.</string>
+    <string name="settings_about_sub">Cliente de Jellyfin para Android TV · GPL-3.0-or-later. Nixie for TV se basa en Glacier (github.com/Glacier-Jellyfin/glacier-androidtv) de sus autores, bajo la GPL-3.0.</string>
+    <string name="settings_source_sub">El código fuente de Nixie for TV, en GitHub desde su primera versión</string>
+    <!-- Nixie: the log goes only where the user chooses (the review, 2026-11-21): Nixie's own report form (Report a
+         problem, tv-1.0-r1) or whoever helps them; never Glacier's tracker. -->
+    <string name="diag_share_step_attach">El navegador guarda el registro como archivo de texto. Adjúntalo a un informe (Ajustes › Sistema › Diagnóstico › Informar de un problema) o compártelo con quien te ayude con Nixie</string>
+    <string name="player_error_log_body">Escanea el código desde la misma red para guardar el registro y compártelo con quien te ayude con Nixie.</string>
+</resources>

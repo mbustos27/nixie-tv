@@ -78,6 +78,9 @@ import io.github.glacier_jellyfin.androidtv.ui.ProgressBar
 import io.github.glacier_jellyfin.androidtv.ui.ratingText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.detail.cardReturn
+import io.github.mbustos27.nixie.tv.detail.cardReturnPage
+import io.github.mbustos27.nixie.tv.detail.rememberCardReturn
 
 private const val COLLECTION_BACKDROP = 740
 private const val TITLE_CLAMP = 22
@@ -103,6 +106,7 @@ fun CollectionDetail(
     val playFocus = remember { FocusRequester() }
     // Held outside the list: the header leaves the composition when scrolled away and must not take focus again on its way back.
     val focusedFor = rememberSaveable(collection.id) { mutableStateOf<Boolean?>(null) }
+    val cardReturn = rememberCardReturn() // Nixie (tv-gate-b)
     val accent = LocalAccent.current.main
     // A key pressed before the titles came: the user moved on, so the late jump to the play button
     // must not take the focus (a second OK would start the playback).
@@ -112,7 +116,7 @@ fun CollectionDetail(
         Modifier.fillMaxSize().background(ImagePageGround).onPreviewKeyEvent {
             if (it.type == KeyEventType.KeyDown) keyPressed = true
             false
-        },
+        }.cardReturnPage(cardReturn), // Nixie (tv-fix-b): a key drops a return still waiting for its card
     ) {
         DetailBackdrop(
             url = collection.backdropUrl ?: items.firstOrNull()?.backdropUrl,
@@ -288,7 +292,12 @@ fun CollectionDetail(
                             bottomPadding = if (index == rows.lastIndex) LAST_ROW_BOTTOM else null,
                             modifier = if (index == 0) Modifier.padding(top = FIRST_ROW_TOP.dp) else Modifier,
                         ) {
-                            items(rowItems, key = { it.id }) { item -> CollectionCard(item, viewModel) }
+                            items(rowItems, key = { it.id }) { item ->
+                                // Nixie (tv-gate-b): Back from the title opened focuses its card again.
+                                Box(
+                                    Modifier.cardReturn(cardReturn, item.id.toString()),
+                                ) { CollectionCard(item, viewModel) }
+                            }
                         }
                     }
                 }

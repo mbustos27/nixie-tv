@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Setup: server -->
     <string name="setup_welcome">Bienvenido</string>
-    <string name="setup_intro">Conecta este dispositivo a tu servidor Jellyfin. Los servidores de la misma red se encuentran solos.</string>
+    <string name="setup_intro">Conecta este dispositivo al servidor Jellyfin que usas. Los servidores de la misma red se encuentran solos.</string>
     <string name="setup_found_on_network">Encontrados en la red</string>
     <string name="setup_saved_servers">Servidores guardados</string>
     <string name="setup_searching">Buscando en la red …</string>
@@ -431,7 +431,7 @@
     <string name="seerr_already_requested">Este título ya se ha solicitado.</string>
     <string name="seerr_request_failed">No se pudo enviar la solicitud.</string>
     <string name="seerr_quota_label">Solicitudes restantes</string>
-    <string name="seerr_request_hint">La solicitud llega a tu servidor a través de Seerr. Según su configuración, primero hay que aprobarla. Después el título aparece solo en tu biblioteca.</string>
+    <string name="seerr_request_hint">La solicitud llega al servidor a través de Seerr. Según su configuración, primero hay que aprobarla. Después el título aparece solo en tu biblioteca.</string>
     <plurals name="seerr_quota">
         <item quantity="one">%1$d de %2$d al día</item>
         <item quantity="many">%1$d de %2$d cada %3$d días</item>
@@ -442,7 +442,7 @@
 
     <!-- Setup (redesign) -->
     <string name="address_heading">Añadir servidor</string>
-    <string name="address_intro">Introduce la dirección de tu servidor Jellyfin, como dominio o como dirección IP.</string>
+    <string name="address_intro">Introduce la dirección del servidor Jellyfin que usas, como dominio o como dirección IP.</string>
     <string name="address_hint">Glacier prueba primero HTTPS y luego HTTP, cada uno en el puerto estándar y en %1$s. Para otro puerto, añade %2$s.</string>
     <string name="address_port">Puerto</string>
     <string name="signin_intro">Inicia sesión con tu cuenta de Jellyfin. Después este dispositivo sigue con la sesión iniciada.</string>
@@ -605,7 +605,6 @@
     <string name="trailer_again">Ver de nuevo</string>
     <string name="trailer_to_details">Volver a los detalles</string>
     <string name="trailer_up_next">A continuación</string>
-    <string name="trailer_forward">Avanzar 15 segundos</string>
     <string name="trailer_add_favorite">Añadir a favoritos</string>
     <string name="trailer_error">Este tráiler no se puede reproducir aquí.</string>
     <string name="trailer_none">Este título no tiene tráileres reproducibles.</string>

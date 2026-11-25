@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_log_ask">Das Protokoll in diesem Netzwerk zum Herunterladen anbieten?</string>
+    <string name="nixie_log_ask_crash">Nixie wurde am %1$s unerwartet beendet. Das Protokoll in diesem Netzwerk zum Herunterladen anbieten?</string>
+    <string name="nixie_yes">Ja</string>
+    <string name="nixie_no">Nein</string>
+    <!-- tv-1.0-r1: Settings › System › Diagnostics › Report a problem (NixieReportProblem). -->
+    <string name="nixie_report">Problem melden</string>
+    <string name="nixie_report_sub">Zeigt einen Code: Mit dem Handy gescannt, öffnet er das Meldeformular von Nixie for TV auf GitHub, mit der Version der App und des Servers schon eingetragen. Der Fernseher sendet nichts.</string>
+    <string name="nixie_report_step_scan">Scanne den Code mit dem Handy. Er öffnet das Formular „Report a problem“ auf GitHub, mit der Version dieser App und des Servers schon eingetragen.</string>
+    <string name="nixie_report_step_say">Beschreibe, was passiert ist und wie es sich wiederholen lässt.</string>
+    <string name="nixie_report_step_log">Für das Protokoll schließe diese Seite, wähle „Protokoll im Netzwerk herunterladen“ und ziehe die Datei, die das Handy speichert, ins Formular.</string>
+    <string name="nixie_report_app">Nixie for TV</string>
+    <string name="nixie_report_server">Jellyfin-Server</string>
+    <string name="nixie_report_unknown">Unbekannt</string>
+    <string name="nixie_report_hint">Der Fernseher sendet nichts: Das Formular öffnet sich auf dem Handy, und du sendest es dort ab. Lass Serveradressen, Benutzernamen und Passwörter weg.</string>
+</resources>

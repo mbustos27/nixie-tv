@@ -6,8 +6,10 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.mbustos27.nixie.tv.jellyfin.NixieTimedApiClient
 import javax.inject.Singleton
 import org.jellyfin.sdk.Jellyfin
+import org.jellyfin.sdk.api.okhttp.OkHttpFactory
 import org.jellyfin.sdk.createJellyfin
 import org.jellyfin.sdk.model.ClientInfo
 
@@ -28,5 +30,10 @@ object JellyfinModule {
     fun provideJellyfin(@ApplicationContext context: Context, clientInfo: ClientInfo): Jellyfin = createJellyfin {
         this.context = context
         this.clientInfo = clientInfo
+        // Nixie (TV-S1): each answer's arrival marked for the detailed log's timings (NixieRequestClock); one OkHttp
+        // client for requests and sockets, as the SDK's default.
+        val okHttp = OkHttpFactory()
+        apiClientFactory = NixieTimedApiClient.wrap(okHttp)
+        socketConnectionFactory = okHttp
     }
 }

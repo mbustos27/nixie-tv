@@ -58,10 +58,15 @@ class Diagnostics @Inject constructor(
     suspend fun shareOnNetwork(): LogServer? = withContext(Dispatchers.IO) {
         val address = localAddress() ?: return@withContext null
         val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
-        LogServer(address, "glacier-log-$time.txt", report(Int.MAX_VALUE).encodeToByteArray()).also {
+        // Nixie: the log file is named after the app.
+        LogServer(address, "nixie-log-$time.txt", report(Int.MAX_VALUE).encodeToByteArray()).also {
             Log.crashReported()
         }
     }
+
+    // Nixie (tv-log-pull): the report shareOnNetwork serves, whole, for the debug build's adb pull
+    // (src/debug AdbLogReceiver, tools/pull-tv-log.ps1).
+    suspend fun fullReport(): String = withContext(Dispatchers.IO) { report(Int.MAX_VALUE) }
 
     /** The summary and as much of the log as fits into [maxBytes]. */
     private suspend fun report(maxBytes: Int): String {
@@ -76,10 +81,12 @@ class Diagnostics @Inject constructor(
                 null
             } ?: it.server.version
         }
-        val header = header(version)
+        // Nixie (tv-1.0-privacy): the device summary goes through the anonymiser too, with the same numbers as the log.
+        val anonymizer = Anonymizer.of(accounts.current())
+        val header = anonymizer.apply(header(version))
         val budget = maxBytes - header.encodeToByteArray().size - 1
         // Placeholders can be longer than what they replace, so cut again afterwards.
-        val log = Anonymizer.of(accounts.current()).apply(Log.read(budget))
+        val log = anonymizer.apply(Log.read(budget))
         return header + "\n" + newestPart(log, budget)
     }
 
@@ -102,7 +109,7 @@ class Diagnostics @Inject constructor(
     }
 
     private fun header(serverVersion: String?): String = buildString {
-        appendLine("Glacier ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.BUILD_TYPE})")
+        appendLine("Nixie for TV ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.BUILD_TYPE})")
         appendLine("Created: ${ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)}")
         val platform = TvPlatform.of(context).name
         appendLine(
@@ -122,7 +129,8 @@ class Diagnostics @Inject constructor(
         appendLine("FFmpeg: ${FfmpegAudio.version() ?: "not included"}")
         appendLine("Server: Jellyfin ${serverVersion ?: "unknown"}")
         appendLine("Detailed logging: ${if (Log.verbose) "on" else "off"}")
-        appendLine("Anonymised: server addresses and names, user names, access tokens")
+        // Nixie (tv-1.0-fixes): every other network address and host name too (NetworkScrub).
+        appendLine("Anonymised: server addresses and names, user names, other addresses and host names, access tokens")
     }
 
     private fun display(): String {

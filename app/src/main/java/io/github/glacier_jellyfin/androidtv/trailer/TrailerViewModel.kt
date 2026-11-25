@@ -35,6 +35,10 @@ import io.github.glacier_jellyfin.androidtv.music.MusicController
 import io.github.glacier_jellyfin.androidtv.navigation.PlayerRoute
 import io.github.glacier_jellyfin.androidtv.navigation.TrailerRoute
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.play.StartTiming
+import io.github.mbustos27.nixie.tv.timing.NixieKeyWait
+import io.github.mbustos27.nixie.tv.trailer.ReturnFocus
+import io.github.mbustos27.nixie.tv.trailer.TrailerHandOver
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -79,6 +83,9 @@ data class TrailerUiState(
     /** The language shown; null while subtitles are off. */
     val subtitle: String? = null,
     val subtitlesOpen: Boolean = false,
+    // Nixie (TV-S3): Left and Right step as in the movie player, by the profile's seek steps (Settings › Playback).
+    val seekBackMs: Long = 10_000,
+    val seekForwardMs: Long = 30_000,
 ) {
     val item: MediaItem? get() = details?.item
     val current: Trailer? get() = trailers.getOrNull(index)
@@ -126,7 +133,12 @@ class TrailerViewModel @Inject constructor(
     private val route = savedStateHandle.toRoute<TrailerRoute>()
     private val itemId = route.itemId?.let(UUID::fromString)
 
-    private val _state = MutableStateFlow(TrailerUiState())
+    private val _state = MutableStateFlow(
+        // Nixie (TV-S3): the movie player's seek steps.
+        settings.settings.value.playback.let {
+            TrailerUiState(seekBackMs = it.seekBack.ms, seekForwardMs = it.seekForward.ms)
+        },
+    )
     val state: StateFlow<TrailerUiState> = _state.asStateFlow()
 
     private val _progress = MutableStateFlow(TrailerProgress())
@@ -150,6 +162,20 @@ class TrailerViewModel @Inject constructor(
     /** Set once the title starts: a second OK must not navigate again. */
     private var leaving = false
     private var closed = false
+
+    // Nixie (TV-S13): the first trailer's whole wait from the OK on Trailer, written with its start's line.
+    private val nixieKeyWait = NixieKeyWait("Trailer", { Log.d(StartTiming.TAG, it) })
+
+    // Nixie (tv-player-4k, TV-S9): each trailer's start, timed for the detailed log (durations only); the first from the
+    // screen's opening, so the title's details count too.
+    private var nixieTiming = StartTiming("Trailer start", log = {
+        Log.d(StartTiming.TAG, it)
+        nixieKeyWait.done() // Nixie (TV-S13)
+    })
+
+    // Nixie (tv-player-4k, design rule 5): where a server file stood when the app went to the background and its player
+    // was released; null while the player is held.
+    private var nixieRestoreAt: Long? = null
 
     /**
      * Where a YouTube seek is headed. The player keeps reporting the old
@@ -190,6 +216,9 @@ class TrailerViewModel @Inject constructor(
             Log.w(TAG, "Trailer playback failed", error)
             fail()
         }
+
+        // Nixie (TV-S9): a server file's first frame ends its start's timing.
+        override fun onRenderedFirstFrame() = nixieTiming.firstFrame()
     }
 
     init {
@@ -205,7 +234,10 @@ class TrailerViewModel @Inject constructor(
                     loadSeerr()
                     return@launch
                 }
-                val details = repository.details(itemId)
+                // Nixie (TV-S13): the details the movie page showed, handed over: nothing asked of the server here.
+                val handed = TrailerHandOver.take(itemId)
+                val details = handed ?: repository.details(itemId)
+                nixieTiming.mark(if (handed != null) "details from the page" else "details") // Nixie (TV-S9)
                 val local = if (details.trailers.localCount > 0) {
                     runSuspendCatching { repository.localTrailers(itemId) }
                         .onFailure { Log.w(TAG, "Loading local trailers failed", it) }
@@ -237,6 +269,7 @@ class TrailerViewModel @Inject constructor(
     private suspend fun loadSeerr() {
         val type = SeerrMediaType.valueOf(checkNotNull(route.seerrType) { "Trailer route without a title" })
         val seerr = seerrRepository.details(type, checkNotNull(route.tmdbId))
+        nixieTiming.mark("details") // Nixie (TV-S9)
         val details = seerr.asItemDetails()
         _state.update {
             it.copy(
@@ -253,6 +286,9 @@ class TrailerViewModel @Inject constructor(
     /** Starts trailer [index] from the beginning. */
     fun play(index: Int) {
         val trailer = _state.value.trailers.getOrNull(index) ?: return
+        // Nixie (TV-S9): a trailer after the first is timed from here.
+        if (_state.value.attempt > 0) nixieTiming = StartTiming("Trailer start")
+        nixieTiming.kind = if (trailer is YouTubeTrailer) "YouTube" else "server file"
         opening?.cancel()
         countdown?.cancel()
         releasePlayer()
@@ -273,22 +309,28 @@ class TrailerViewModel @Inject constructor(
         }
     }
 
-    private fun openLocal(trailer: LocalTrailer) {
+    // Nixie (rule 5): [startMs] and [paused] bring a released server file back where it was.
+    private fun openLocal(
+        trailer: LocalTrailer,
+        startMs: Long = 0,
+        paused: Boolean = false,
+    ) {
         opening = viewModelScope.launch {
             try {
-                val source = playback.open(trailer.id, startMs = 0, audioIndex = null, subtitleIndex = null)
+                val source = playback.open(trailer.id, startMs = startMs, audioIndex = null, subtitleIndex = null)
+                nixieTiming.mark("server answer") // Nixie (TV-S9)
                 val player = GlacierPlayer.create(
                     context,
                     StreamRequest(
                         url = source.url,
                         isHls = source.isHls,
                         headers = source.headers,
-                        startPositionMs = 0,
+                        startPositionMs = startMs,
                     ),
                 ).player
                 player.addListener(listener)
                 applySubtitles(player, subtitlePreference)
-                player.playWhenReady = true
+                player.playWhenReady = !paused
                 _state.update { it.copy(player = player) }
                 startTicker(player)
             } catch (e: CancellationException) {
@@ -404,12 +446,46 @@ class TrailerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Nixie (tv-player-4k, design rule 5): the app went to the background. A server file's player is released, its
+     * place kept; [nixieForeground] opens it there again, paused. A YouTube trailer's web view pauses on its own.
+     */
+    fun nixieBackground() {
+        val state = _state.value
+        if (state.current !is LocalTrailer || nixieRestoreAt != null) return
+        val over = state.ended || state.failed
+        if (over || closed || leaving) return
+        val player = state.player
+        if (player == null && opening?.isActive != true) return
+        val at = player?.currentPosition ?: 0
+        opening?.cancel()
+        releasePlayer()
+        nixieRestoreAt = at
+        _state.update { it.copy(loading = true, playWhenReady = false) }
+        Log.i(TAG, "In the background: the server file's player is released at ${at / 1000} s")
+    }
+
+    /** Nixie (rule 5): back in front after [nixieBackground]: the same file, where it stood, paused. */
+    fun nixieForeground() {
+        val at = nixieRestoreAt ?: return
+        nixieRestoreAt = null
+        val trailer = _state.value.current as? LocalTrailer ?: return
+        Log.i(TAG, "Back in front: the server file opens again at ${at / 1000} s, paused")
+        startLoadTimeout()
+        openLocal(trailer, startMs = at, paused = true)
+    }
+
     fun seekBy(deltaMs: Long) {
+        val pending = seekTarget?.takeIf { System.currentTimeMillis() - seekStartedAt < SEEK_SETTLE_MS }
+        seekTo((pending ?: _progress.value.positionMs) + deltaMs)
+    }
+
+    // Nixie (TV-S3): the seek bar's scrub jumps to where it stopped, as in the movie player.
+    fun seekTo(positionMs: Long) {
         val state = _state.value
         if (state.loading || state.ended || state.failed) return
         val duration = _progress.value.durationMs
-        val pending = seekTarget?.takeIf { System.currentTimeMillis() - seekStartedAt < SEEK_SETTLE_MS }
-        val target = ((pending ?: _progress.value.positionMs) + deltaMs).coerceAtLeast(0)
+        val target = positionMs.coerceAtLeast(0)
         // Past the end ends the trailer (design).
         if (duration > 0 && target >= duration) return onEnded()
         state.player?.seekTo(target)
@@ -438,6 +514,8 @@ class TrailerViewModel @Inject constructor(
                 close()
             } else {
                 pause()
+                // Nixie (review): the movie takes the trailer's place, so Back from it does not land on Trailer.
+                ReturnFocus.handedOver()
                 _events.send(UiEvent.Navigate(PlayerRoute(target.toString()), replace = true))
             }
         }
@@ -481,8 +559,13 @@ class TrailerViewModel @Inject constructor(
     override fun onYouTubeState(videoId: String, state: Int) {
         if (!isCurrent(videoId)) return
         when (state) {
-            YT_PLAYING -> _state.update { it.copy(loading = false, playWhenReady = true) }
+            YT_PLAYING -> {
+                nixieTiming.firstFrame() // Nixie (TV-S9): the IFrame API's first "playing" is its first frame
+                _state.update { it.copy(loading = false, playWhenReady = true) }
+            }
+
             YT_PAUSED -> _state.update { it.copy(playWhenReady = false) }
+
             YT_ENDED -> onEnded()
         }
     }
@@ -513,9 +596,19 @@ class TrailerViewModel @Inject constructor(
         }
     }
 
+    // Nixie (TV-S9): the steps of a YouTube trailer's start, for its timing.
+    override fun onYouTubeStep(videoId: String, step: String) {
+        if (isCurrent(videoId)) nixieTiming.mark(step)
+    }
+
+    // Nixie (TV-S9): the movie page made the player ahead; the timing says so.
+    override fun onYouTubeMadeAhead(videoId: String) {
+        if (isCurrent(videoId)) nixieTiming.kind = "YouTube, made ahead"
+    }
+
     override fun onYouTubeError(videoId: String, code: Int) {
         if (!isCurrent(videoId)) return
-        Log.w(TAG, "YouTube player error $code for $videoId")
+        Log.w(TAG, "YouTube player error $code") // Nixie (tv-1.0-privacy): not the video's id, it names the title
         fail()
     }
 

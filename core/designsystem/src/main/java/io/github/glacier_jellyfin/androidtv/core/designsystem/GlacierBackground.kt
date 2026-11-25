@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.takeOrElse
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
 /**
  * The page ground for screens without a picture: a wide glow in the accent
@@ -23,6 +25,11 @@ fun GlacierBackground(modifier: Modifier = Modifier, content: @Composable BoxSco
         modifier = modifier
             .fillMaxSize()
             .drawBehind {
+                // Nixie: a theme may paint its own ground (Drive-in: a dusk sky).
+                NixieTheme.slots.pageGround?.let {
+                    it()
+                    return@drawBehind
+                }
                 drawRect(Ground)
                 glow(
                     accent.copy(alpha = 0.42f),
@@ -59,6 +66,6 @@ private fun DrawScope.glow(
     }
 }
 
-private val Ground = Color(0xFF05090D)
+private val Ground get() = NixieTheme.tokens.ground.takeOrElse { Color(0xFF05090D) }
 
 private fun Float.dp2px(scope: DrawScope) = this * scope.density

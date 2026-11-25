@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -32,6 +33,13 @@ import io.github.glacier_jellyfin.androidtv.setup.ServerListScreen
 import io.github.glacier_jellyfin.androidtv.setup.SignInScreen
 import io.github.glacier_jellyfin.androidtv.trailer.TrailerScreen
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.diagnostics.NixieLogText
+import io.github.mbustos27.nixie.tv.home.nixieBackToHome
+import io.github.mbustos27.nixie.tv.library.NixieLibrariesRoute
+import io.github.mbustos27.nixie.tv.library.NixieLibrariesScreen
+import io.github.mbustos27.nixie.tv.start.nixieDropServerPages
+import io.github.mbustos27.nixie.tv.timing.NixieKeyClock
+import io.github.mbustos27.nixie.tv.timing.nixieKeyClock
 
 /** Screens without arguments; navigating to one that is already on top does nothing. */
 private val SingleScreens = setOf(
@@ -57,8 +65,14 @@ fun GlacierNavHost(
     // The whole back stack is readable only through currentBackStack, which lint reports as
     // library-restricted although Navigation offers no public way to it.
     @SuppressLint("RestrictedApi")
-    val navigate: (UiEvent.Navigate) -> Unit = { event ->
-        Log.d(TAG, "Open ${event.route}")
+    val navigate: (UiEvent.Navigate) -> Unit = navigate@{ event ->
+        // Nixie (tv-1.0-fixes): ids, no names (a shared log may go into a public issue).
+        Log.d(TAG, "Open ${NixieLogText.route(event.route)}")
+        NixieKeyClock.navigated() // Nixie (TV-S13): the wait from the OK, split
+        // Nixie (tv-home-two-rows): the top bar's Home goes back to the Home on the back stack, as it is.
+        if (navController.nixieBackToHome(event)) return@navigate
+        // Nixie (tv-fix-a): a removed server's pages leave the back stack, so Back never leads to them.
+        if (navController.nixieDropServerPages(event)) return@navigate
         val current = navController.currentDestination?.id
         // The screen under the title and cast pages on top, such as a library or search.
         // It learns the title opened last, to focus that one when Back returns to it.
@@ -105,6 +119,8 @@ fun GlacierNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
+        // Nixie (TV-S13): every OK is noted (NixieKeyClock), for the detailed log's waits from the key.
+        modifier = Modifier.nixieKeyClock(),
         // The design's screen entrance (gScreen): fade in while rising 14px.
         enterTransition = { fadeIn() + slideInVertically { 14 } },
         exitTransition = { fadeOut() },
@@ -131,6 +147,8 @@ fun GlacierNavHost(
             )
         }
         composable<FolderRoute> { FolderScreen(onNavigate = navigate) }
+        // Nixie (tv-home-two-rows): the top bar's Libraries page.
+        composable<NixieLibrariesRoute> { NixieLibrariesScreen(onNavigate = navigate) }
         composable<PhotoRoute> { PhotoScreen(onNavigate = navigate) }
         composable<DetailRoute> { DetailScreen(onNavigate = navigate, onBack = back) }
         composable<PersonRoute> { PersonScreen(onNavigate = navigate) }

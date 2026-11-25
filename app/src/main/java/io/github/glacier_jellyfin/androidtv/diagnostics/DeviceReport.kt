@@ -34,15 +34,32 @@ internal object DeviceReport {
         }
     }
 
-    /** The audio outputs Android reports, with the encodings each takes. */
+    /**
+     * The audio outputs Android reports, with the encodings each takes. Nixie (tv-1.0-privacy): by their kind, never
+     * their name: a Bluetooth device's is the one its owner gave it ("Jane's AirPods").
+     */
     fun audioOutputs(context: Context): List<String> {
         val manager = context.getSystemService(AudioManager::class.java) ?: return emptyList()
         return manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { device ->
             val encodings = device.encodings.map { ENCODINGS[it] ?: "encoding $it" }.ifEmpty { listOf("any") }
             val channels = device.channelCounts.maxOrNull()?.toString() ?: "any"
-            "  ${DEVICE_TYPES[device.type] ?: "type ${device.type}"} \"${device.productName}\": ${encodings.joinToString()}, channels $channels"
+            val type = DEVICE_TYPES[device.type] ?: "type ${device.type}"
+            "  $type (${outputKind(type)}): ${encodings.joinToString()}, channels $channels"
         }
     }
+
+    /** "a Bluetooth audio device", "an HDMI device": what an output is, from its type's name. */
+    internal fun outputKind(type: String): String = when {
+        type.startsWith("BLUETOOTH") || type.startsWith("BLE_") -> "a Bluetooth audio device"
+        type.startsWith("HDMI") -> "an HDMI device"
+        type.startsWith("USB") -> "a USB audio device"
+        type.startsWith("WIRED") || type in WIRED_LINES -> "a wired audio device"
+        type.startsWith("BUILTIN") -> "built in"
+        type == "HEARING_AID" -> "a hearing aid"
+        else -> "an audio device"
+    }
+
+    private val WIRED_LINES = setOf("LINE_ANALOG", "LINE_DIGITAL", "AUX_LINE")
 
     /** How Media3 sees the output: the bitstreams it passes through and the channels it allows. */
     @OptIn(UnstableApi::class)

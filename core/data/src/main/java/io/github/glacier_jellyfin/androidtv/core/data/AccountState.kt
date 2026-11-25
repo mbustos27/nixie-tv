@@ -1,5 +1,6 @@
 package io.github.glacier_jellyfin.androidtv.core.data
 
+import io.github.mbustos27.nixie.tv.data.NamesSeen
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,6 +15,8 @@ data class AccountState(
     val lastServerId: String? = null,
     /** Which profile opens by itself when the app starts (Settings › System). */
     val startProfile: StartProfile = StartProfile(),
+    // Nixie (tv-1.0-privacy): every server and profile name had here, for the shared log's anonymiser.
+    val nixieSeen: NamesSeen = NamesSeen(),
 )
 
 @Serializable
@@ -38,6 +41,11 @@ data class StoredUser(
     val pinChangedAt: Long? = null,
     val protection: Protection = Protection(),
     val lastUsedAt: Long,
+    /**
+     * Nixie: the device id this profile's token belongs to (DeviceIds). Null for a sign-in from
+     * before, which goes out as the install's id and has it written in here when next opened.
+     */
+    val deviceId: String? = null,
 )
 
 @Serializable

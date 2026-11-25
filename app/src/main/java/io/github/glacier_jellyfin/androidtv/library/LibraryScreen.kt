@@ -118,6 +118,22 @@ import io.github.glacier_jellyfin.androidtv.ui.UiEvent
 import io.github.glacier_jellyfin.androidtv.ui.ratingText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.underline
+import io.github.mbustos27.nixie.tv.home.nixieLibraryTarget
+import io.github.mbustos27.nixie.tv.library.NixieGridArt
+import io.github.mbustos27.nixie.tv.library.NixieGridCells
+import io.github.mbustos27.nixie.tv.library.NixieHeldDown
+import io.github.mbustos27.nixie.tv.library.NixieKeepRowsInPlace
+import io.github.mbustos27.nixie.tv.library.NixieOrderButton
+import io.github.mbustos27.nixie.tv.library.NixieOwnScope
+import io.github.mbustos27.nixie.tv.library.NixiePrefetchArt
+import io.github.mbustos27.nixie.tv.library.nixieBackToPage
+import io.github.mbustos27.nixie.tv.library.nixieHoldDown
+import io.github.mbustos27.nixie.tv.library.nixieListEnd
+import io.github.mbustos27.nixie.tv.library.nixieRowEnd
+import io.github.mbustos27.nixie.tv.library.rememberGridArtSizes
+import io.github.mbustos27.nixie.tv.library.rememberHeldDown
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -145,7 +161,8 @@ fun LibraryScreen(
     val sizes = LocalCardSizes.current
     val density = LocalDensity.current
 
-    val gridState = rememberLazyGridState()
+    // Nixie (TV-S2): the rows ahead are composed before they scroll in, and the row just left stays composed.
+    val gridState = rememberLazyGridState(cacheWindow = NixieGridCells.cacheWindow)
     val firstCardFocus = remember { FocusRequester() }
     val jumpFocus = remember { FocusRequester() }
     val railFocus = remember { FocusRequester() }
@@ -160,7 +177,8 @@ fun LibraryScreen(
         snapshotFlow { firstRowHome(gridState) }.collect { top -> if (top != null) railTop = top }
     }
     val restoreFocus = remember { FocusRequester() }
-    LaunchedEffect(lastFocusId) { lastFocusId?.let(viewModel::focused) }
+    // Nixie (TV-S2): followed outside the composition, so a move in the grid does not compose the whole screen again.
+    LaunchedEffect(Unit) { snapshotFlow { lastFocusId }.collect { it?.let(viewModel::focused) } }
     // By id: titles loaded in before them (on the way back up after a jump) move them down.
     var focusedId by remember { mutableStateOf<String?>(null) }
     var jumpTarget by remember { mutableStateOf<String?>(null) }
@@ -234,7 +252,10 @@ fun LibraryScreen(
     var inContent by remember { mutableStateOf(false) }
     var inToolbar by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    BackHandler(enabled = inContent) {
+    // Nixie (tv-gate-b): a library opened from another page (Libraries, a genre, a title's library) goes straight back
+    // to it from its cards in one press, where its card has the focus again; a page of the top bar keeps Glacier's way.
+    val backToPage = nixieBackToPage(viewModel.inNavBar, viewModel.nixieFromBar)
+    BackHandler(enabled = inContent && !backToPage) {
         scope.launch {
             // After a jump the list starts at the letter: under the toolbar it starts at the top again.
             viewModel.toStart()
@@ -300,6 +321,22 @@ fun LibraryScreen(
         withFrameNanos { }
         initialFocusDone =
             runCatching { (if (restored != null) restoreFocus else firstCardFocus).requestFocus() }.isSuccess
+    }
+
+    // Nixie (TV-S2): the list's start, read by a card when it gets the focus; the cards' artwork sizes; the next rows'
+    // artwork fetched before they scroll in.
+    val offsetNow = rememberUpdatedState(state.offset)
+    val art = rememberGridArtSizes(sizes, density)
+    NixiePrefetchArt(gridState, state.items, positions, columns, art, enabled = !songList && folder == null)
+    // Nixie (TV-S13): titles loaded in before those on screen (above a jump's letter) leave them where they are.
+    NixieKeepRowsInPlace(gridState, state.items, positions)
+
+    // Nixie (TV-S1): the first row drawn, for the detailed log's timing.
+    LaunchedEffect(state.items.isNotEmpty()) {
+        if (state.items.isNotEmpty()) {
+            withFrameNanos { }
+            viewModel.firstRowShown()
+        }
     }
 
     // Load the next page when the grid gets within three rows of the end.
@@ -372,6 +409,10 @@ fun LibraryScreen(
         }
         viewModel.jumpHandled()
     }
+    // Nixie (tv-gate-b): Down on the last row of what is loaded waits for the titles below (HeldDown.kt).
+    val heldDown = rememberHeldDown()
+    val heldCard = { focusedId.takeUnless { inToolbar } }
+    NixieHeldDown(heldDown, gridState, heldCard, state.items.size, state.loading, state.failed, viewModel::loadMore)
 
     // The first load covers the page: the remote must not reach the toolbar or the navigation behind it.
     Box(
@@ -411,6 +452,14 @@ fun LibraryScreen(
                         .weight(1f)
                         .fillMaxSize()
                         .focusRequester(gridFocus)
+                        .nixieHoldDown(
+                            heldDown,
+                            gridState,
+                            heldCard,
+                            count = { state.items.size },
+                            more = { !state.complete && !state.failed && !state.inFolders },
+                            ask = viewModel::loadMore,
+                        )
                         // Moving in with the D-pad (Down from the bar) lands on the card left last. Not a focus
                         // restorer: it would also take a request for another card, such as Left from the A–Z rail.
                         .focusProperties {
@@ -453,6 +502,8 @@ fun LibraryScreen(
                                 viewModel.videosOptions(videosTitle)
                             },
                             optionsButtonFocus = optionsButtonFocus,
+                            // Nixie (tv-1.0-r1): the sort menu's own flip (the active sort picked again), so it is kept.
+                            onFlipOrder = { viewModel.setSort(viewModel.state.value.query.sort) },
                         )
                     }
                     if (folder != null) {
@@ -514,17 +565,33 @@ fun LibraryScreen(
                     state.items.forEachIndexed { index, item ->
                         val group = item.group
                         if (group != null && startsGroup(state.items, index)) {
-                            item(span = { GridItemSpan(maxLineSpan) }, key = "group-$group") {
+                            item(
+                                span = { GridItemSpan(maxLineSpan) },
+                                // Nixie (TV-S1): with its first title, as a group can come back further down
+                                // (the server's order puts titles without a rating among those at 0).
+                                key = "group-$group-${item.id}",
+                                contentType = NixieGridCells.HEADING, // Nixie (TV-S2)
+                            ) {
                                 GroupHeading(group, state.query.sort, cards = !songList)
                             }
                         }
-                        item(key = item.id) {
+                        // Nixie (TV-S2): typed cells, so a card scrolled in reuses a card's composition.
+                        // Nixie (TV-S13): after a jump rows start at its letter: the list's first row may end early.
+                        val span = NixieGridCells.span(state.offset, state.rowPhase, index)
+                        item(
+                            key = item.id,
+                            span = span,
+                            contentType = NixieGridCells.typeOf(item),
+                        ) {
                             val id = item.id.toString()
+                            // Nixie (TV-S2): each card follows only whether it is the one to focus, not every move.
+                            val isJumpTarget by remember(id) { derivedStateOf { id == jumpTarget } }
+                            val isRestored by remember(id) { derivedStateOf { id == lastFocusId } }
                             val focus = when {
-                                id == jumpTarget -> Modifier.focusRequester(jumpFocus)
+                                isJumpTarget -> Modifier.focusRequester(jumpFocus)
                                 index == 0 -> Modifier.focusRequester(firstCardFocus)
                                 else -> Modifier
-                            }.then(if (id == lastFocusId) Modifier.focusRequester(restoreFocus) else Modifier)
+                            }.then(if (isRestored) Modifier.focusRequester(restoreFocus) else Modifier)
                                 // A group's last row is often short: Right goes to the rail, not up to the row above.
                                 .then(
                                     if (showRail && group != null && (
@@ -536,13 +603,16 @@ fun LibraryScreen(
                                         Modifier
                                     },
                                 )
+                                // Nixie (tv-1.0-r1): the list's last card too, grouped or not: to the rail, else it stays.
+                                .nixieListEnd(index == state.items.lastIndex, railFocus.takeIf { showRail })
                             val onFocus = Modifier.onFocusChanged {
                                 if (it.isFocused) {
                                     inContent = true
                                     focusedId = id
                                     lastFocusId = id
                                     // After a jump far down the list starts there: the titles before it load on the way back up.
-                                    if (state.offset > 0 &&
+                                    // Nixie (TV-S2): read when focused, so a new page leaves the card's modifiers as they were.
+                                    if (offsetNow.value > 0 &&
                                         index < (if (songList) SONG_LOOKAHEAD else 3 * columns)
                                     ) {
                                         viewModel.loadBefore(columns)
@@ -565,11 +635,8 @@ fun LibraryScreen(
                                 )
                             } else {
                                 GridCard(
-                                    imageUrl = if (item.kind == ItemKind.MusicVideo) {
-                                        item.thumbUrl ?: item.posterUrl
-                                    } else {
-                                        item.posterUrl
-                                    },
+                                    // Nixie (TV-S2, TV-S1): the artwork asked at the card's size, posters as the web.
+                                    imageUrl = NixieGridArt.cardUrl(item, art),
                                     title = item.title,
                                     caption = captionFor(
                                         item,
@@ -599,19 +666,15 @@ fun LibraryScreen(
                                         else -> CardShape.Poster
                                     },
                                     // Played means nothing for music: music videos carry no check.
-                                    watched = item.played && item.kind in setOf(
-                                        ItemKind.Movie,
-                                        ItemKind.Series,
-                                        ItemKind.Episode,
-                                        ItemKind.Collection,
-                                    ),
+                                    watched = item.played && item.kind in WatchedKinds, // Nixie (TV-S2): made once
                                     // Collections and shows count what is left to watch; a collection's size is in the caption.
                                     count = item.unwatchedCount.takeIf {
                                         item.kind == ItemKind.Collection ||
                                             item.kind == ItemKind.Series
                                     },
                                     locked = item.showsLock(),
-                                    modifier = focus.then(onFocus),
+                                    // Nixie (TV-S13): a short first row's last card keeps its width.
+                                    modifier = focus.then(onFocus).nixieRowEnd(span != null),
                                 )
                             }
                         }
@@ -686,6 +749,7 @@ fun LibraryScreen(
                             key = "empty",
                         ) {
                             InFreeSpace(gridState, "empty", screenCentred = true) {
+                                // Nixie (tv-home-two-rows): the Collections page on a server with none says so.
                                 Text(
                                     stringResource(
                                         when {
@@ -693,6 +757,7 @@ fun LibraryScreen(
                                             state.query.favoritesOnly && state.query.kind == LibraryKind.Music -> R.string.library_empty_music_favorites
                                             state.query.favoritesOnly -> R.string.library_empty_favorites
                                             state.query.unwatchedOnly -> R.string.library_empty_unwatched
+                                            state.query.nixieAllCollections -> R.string.nixie_collections_none
                                             else -> R.string.library_empty
                                         },
                                     ),
@@ -708,25 +773,33 @@ fun LibraryScreen(
                     }
                 }
             }
+            // Nixie (TV-S2): the focused title's letter is read in the rail's own scope, not by the whole screen.
             if (showRail) {
-                val current = state.items.firstOrNull { it.id.toString() == focusedId }?.let(::letterOf)
-                AlphabetRail(
-                    letters = state.letters,
-                    descending = state.query.orderDescending,
-                    current = current,
-                    focus = railFocus,
-                    onLetter = { viewModel.jumpToLetter(it, columns) },
-                    // Left lands on the title a letter jumped to, while it is on screen (visible items carry the titles' ids as keys).
-                    onLeft = {
-                        val target = jumpTarget
-                        target != null && gridState.layoutInfo.visibleItemsInfo.any { it.key.toString() == target } &&
-                            runCatching { jumpFocus.requestFocus() }.getOrDefault(false)
-                    },
-                    modifier = Modifier
-                        .onFocusChanged { if (it.hasFocus) inContent = true }
-                        .padding(end = 22.dp)
-                        .offset { IntOffset(0, if (railTop >= 0) railTop else RAIL_TOP.dp.roundToPx()) },
-                )
+                NixieOwnScope {
+                    // The rail is composed again only when the letter changes, not at every move.
+                    val items = state.items
+                    val current by remember(items) {
+                        derivedStateOf { items.firstOrNull { it.id.toString() == focusedId }?.let(::letterOf) }
+                    }
+                    AlphabetRail(
+                        letters = state.letters,
+                        descending = state.query.orderDescending,
+                        current = current,
+                        focus = railFocus,
+                        onLetter = { viewModel.jumpToLetter(it, columns) },
+                        // Left lands on the title a letter jumped to, while it is on screen (visible items carry the titles' ids as keys).
+                        onLeft = {
+                            val target = jumpTarget
+                            target != null &&
+                                gridState.layoutInfo.visibleItemsInfo.any { it.key.toString() == target } &&
+                                runCatching { jumpFocus.requestFocus() }.getOrDefault(false)
+                        },
+                        modifier = Modifier
+                            .onFocusChanged { if (it.hasFocus) inContent = true }
+                            .padding(end = 22.dp)
+                            .offset { IntOffset(0, if (railTop >= 0) railTop else RAIL_TOP.dp.roundToPx()) },
+                    )
+                }
             }
         }
 
@@ -756,10 +829,35 @@ fun LibraryScreen(
             )
         }
 
+        // Nixie (TV-S1): a wait for the whole list while titles are on screen (an A–Z jump) says how far it has come,
+        // under the top bar's end; read in its own scope, so the count moving composes only this line.
+        if (state.items.isNotEmpty()) {
+            val corner = Modifier.align(Alignment.TopEnd).padding(top = 112.dp, end = 24.dp)
+            NixieOwnScope {
+                progress?.takeIf { it.isFor(state.query) }?.let {
+                    Text(
+                        stringResource(
+                            R.string.library_loading_progress,
+                            it.loaded,
+                            countText(state.query.scope, state.query.kind, it.total),
+                        ),
+                        style = GlacierText.body(17),
+                        color = GlacierColors.Mist,
+                        modifier = corner,
+                    )
+                }
+            }
+        }
+
         MusicActionsSheet(viewModel.musicActions)
 
         TopNav(
-            active = NavTarget.Library(state.query.kind),
+            // Nixie: a starred library's page lights its own entry; the Collections page its (tv-home-two-rows).
+            active = if (state.query.nixieAllCollections) {
+                NavTarget.Collections
+            } else {
+                nixieLibraryTarget(state.query.kind, state.query.libraryId)
+            },
             kinds = LocalLibraryKinds.current,
             userName = state.userName,
             onSelect = viewModel::onNav,
@@ -888,7 +986,14 @@ private fun hoursText(minutes: Int): String = "%d:%02d".format(Locale.ROOT, minu
 
 @Composable
 private fun Header(state: LibraryState) {
-    val title = state.title ?: stringResource(state.query.kind.title)
+    // Nixie (tv-home-two-rows): the Collections page is called that.
+    val title = state.title ?: stringResource(
+        if (state.query.nixieAllCollections) R.string.scope_collections else state.query.kind.title,
+    )
+    // Nixie: a theme's heading (NixieSlots.browse.libraryHeader) with the same two lines.
+    NixieTheme.slots.browse.libraryHeader?.let { header ->
+        return header(title, headerLine(state), Modifier)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = GlacierText.display(50), color = GlacierColors.Ice)
         // The sort button already shows sort and order, so the line only counts. It keeps its
@@ -911,6 +1016,20 @@ private fun Header(state: LibraryState) {
     }
 }
 
+// Nixie: the line under a library's title, as Glacier's Header writes it.
+@Composable
+private fun headerLine(state: LibraryState): String {
+    val total = state.total
+    return when {
+        state.inFolders ->
+            (listOf(stringResource(R.string.scope_music_videos)) + state.folderPath.map { it.name }).joinToString(" › ")
+
+        total != null -> countText(state.query.scope, state.query.kind, total)
+
+        else -> " "
+    }
+}
+
 @Composable
 private fun Toolbar(
     modifier: Modifier,
@@ -928,6 +1047,8 @@ private fun Toolbar(
     /** The options for the music videos Play would play. */
     onVideoOptions: () -> Unit,
     optionsButtonFocus: FocusRequester,
+    /** Nixie (tv-1.0-r1): flips the list's direction (the Collections page's order button). */
+    onFlipOrder: () -> Unit,
 ) {
     Row(
         modifier
@@ -990,6 +1111,8 @@ private fun Toolbar(
                 onClick = onFavoritesOnly,
             )
         }
+        // Nixie (tv-1.0-r1): the Collections page's direction, flipped in one press (NixieCollectionsPage).
+        NixieOrderButton(state.query, onFlip = onFlipOrder)
         // Genres are always listed by name.
         if (!state.query.listedByName) {
             SortButton(
@@ -1064,25 +1187,28 @@ private fun RailLetter(
     val accent = LocalAccent.current.main
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    // Nixie: a theme's letter colours (NixieSlots.browse.letterRail).
+    val look = NixieTheme.slots.browse.letterRail?.invoke(focused, current, available)
     Box(
         modifier
             .focusScale(focused)
             .size(34.dp, 20.dp)
             .clip(PillShape)
             .background(
-                when {
+                look?.background ?: when {
                     focused -> accent
                     current -> accent.copy(alpha = 0.18f)
                     else -> Color.Transparent
                 },
             )
+            .then(look?.let { Modifier.underline(it.underline) } ?: Modifier)
             .clickable(interactionSource = interaction, indication = null, enabled = available, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             letter.toString(),
             style = GlacierText.body(14, FontWeight.Bold),
-            color = when {
+            color = look?.foreground ?: when {
                 focused -> GlacierColors.Void
                 current -> GlacierColors.Ice
                 available -> GlacierColors.Mist
@@ -1156,7 +1282,7 @@ private fun gridPositions(items: List<MediaItem>): IntArray {
 /** The card's caption, plus the value the grid is sorted by when the caption does not show it yet. */
 @Composable
 private fun captionFor(item: MediaItem, sort: LibrarySort?): String? {
-    val showsYear = item.kind in setOf(ItemKind.Movie, ItemKind.Series, ItemKind.Episode)
+    val showsYear = item.kind in YearKinds // Nixie (TV-S2): made once
     val sorted = when (sort) {
         LibrarySort.Year -> item.year?.takeUnless { showsYear }?.toString()
 
@@ -1256,3 +1382,9 @@ private const val GROUP_HEADING_DROP = 22
 
 /** The grid's loader is at least this tall before the grid has measured where it sits. */
 private const val LOADER_MIN_HEIGHT = 360
+
+/** Nixie (TV-S2): titles that carry a watched check, a set made once instead of for every card composed. */
+private val WatchedKinds = setOf(ItemKind.Movie, ItemKind.Series, ItemKind.Episode, ItemKind.Collection)
+
+/** Nixie (TV-S2): titles whose caption already shows the year (made once). */
+private val YearKinds = setOf(ItemKind.Movie, ItemKind.Series, ItemKind.Episode)

@@ -3,9 +3,15 @@ package io.github.glacier_jellyfin.androidtv.core.data.media
 import io.github.glacier_jellyfin.androidtv.core.data.Session
 import io.github.glacier_jellyfin.androidtv.core.data.SessionManager
 import io.github.glacier_jellyfin.androidtv.core.data.settings.HomeSettings
+import io.github.glacier_jellyfin.androidtv.core.data.settings.SettingsRepository
 import io.github.glacier_jellyfin.androidtv.core.data.settings.SpotlightSource
 import io.github.glacier_jellyfin.androidtv.core.data.settings.SpotlightType
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.runSuspendCatching
+import io.github.mbustos27.nixie.tv.data.ContinueWatchingRules
+import io.github.mbustos27.nixie.tv.data.HomeParts
+import io.github.mbustos27.nixie.tv.data.HomeViews
+import io.github.mbustos27.nixie.tv.data.TidyNames
+import io.github.mbustos27.nixie.tv.data.localNow
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,10 +23,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.showApi
-import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.userDataApi
 import org.jellyfin.sdk.api.client.extensions.userViewApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -38,7 +44,9 @@ class HomeRepository @Inject constructor(
     private val sessions: SessionManager,
     private val ageFilter: AgeFilter,
     private val liveTvRepository: LiveTvRepository,
-) {
+    // Nixie: the home stream's settings (NixieHomeSettings).
+    private val settingsRepository: SettingsRepository,
+) : HomeParts { // Nixie: Home's parts, each on its own (tv-home-start)
 
     private val _kinds = MutableStateFlow(DefaultKinds)
 
@@ -63,73 +71,76 @@ class HomeRepository @Inject constructor(
     /** The libraries with a "New in" row, for Settings › Home; known once the home screen loaded. */
     val latestLibraries: StateFlow<List<Library>> = _latestLibraries.asStateFlow()
 
-    /** Loads all home rows in parallel for the signed-in profile. */
-    suspend fun load(): HomeContent = withContext(Dispatchers.IO) {
+    // ---- Nixie (tv-home-start): Home's parts, each asked for on its own (HomeStart). Home used to wait for all of
+    // them, the libraries' counts included, before it drew anything: about a minute on a big, slow server. ----
+
+    /** Home drawn from what is saved on the device: the navigation's kinds and Live TV entry follow it at once. */
+    fun seed(views: HomeViews) {
+        if (_libraries.value.isNotEmpty()) return
+        _kinds.value = views.libraries.map { it.kind }.distinct().sorted()
+        _liveTv.value = views.liveTv
+        _libraries.value = views.libraries
+        _latestLibraries.value = views.latestLibraries
+    }
+
+    /**
+     * The libraries without their counts, for the top bar; the kinds and Live TV follow. Nixie (tv-home-two-rows): one
+     * request: Home has no "New in" rows any more, so the profile's "leave out of latest" list is not asked.
+     */
+    override suspend fun views(): HomeViews = withContext(Dispatchers.IO) {
         val session = requireSession()
         val mapper = MediaMapper(session.api)
-        val userId = session.userId
-
-        val librariesAsync = async { libraries(session, mapper) }
-        val resumeAsync = async { resume(session) }
-        val nextUpAsync = async { nextUp(session) }
-        val favoritesAsync = async { runSuspendCatching { favorites(session, mapper) }.getOrDefault(emptyList()) }
-        val excludesAsync = async {
-            session.api.userApi.getCurrentUser().content.configuration?.latestItemsExcludes.orEmpty().toSet()
-        }
-
-        val libraries = librariesAsync.await()
+        val known = _libraries.value.associate { it.id to it.itemCount }
+        val libraries = libraries(session, mapper).map { it.copy(itemCount = known[it.id]) }
         _kinds.value = libraries.map { it.kind }.distinct().sorted()
-        val excludes = excludesAsync.await()
-        // Home videos have no detail pages to open from a row; they are browsed by folder.
-        val latestLibraries = libraries.filterNot { it.id in excludes || it.kind == LibraryKind.HomeVideos }
         _libraries.value = libraries
-        _latestLibraries.value = latestLibraries
-        val latest = latestLibraries
-            .map { library ->
-                async {
-                    library to ageFilter.screen(
-                        latest(session, userId, library).map(mapper::item),
-                    )
-                }
-            }
-            .awaitAll()
-            .filter { (_, items) -> items.isNotEmpty() }
-
-        val hasMusic = libraries.any { it.kind == LibraryKind.Music }
-        val recentAlbums = if (hasMusic) {
-            runSuspendCatching {
-                recentAlbums(session, mapper)
-            }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-        val favoriteSongs = if (hasMusic) {
-            runSuspendCatching {
-                favoriteSongs(session, mapper)
-            }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-        // Set by libraries(), so known here.
-        val liveChannels = if (_liveTv.value) {
-            runSuspendCatching { liveChannels() }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
-
-        HomeContent(
-            libraries = libraries,
-            continueWatching = ageFilter.screen(
-                mergeContinueWatching(resumeAsync.await(), nextUpAsync.await()).map(mapper::item),
-            ),
-            latest = latest,
-            favorites = favoritesAsync.await(),
-            latestLibraries = latestLibraries,
-            recentAlbums = recentAlbums,
-            favoriteSongs = favoriteSongs,
-            liveChannels = liveChannels,
-        )
+        HomeViews(libraries, liveTv = _liveTv.value)
     }
+
+    /** Each library's count of titles: a count is a query over the whole library. Nixie (tv-home-two-rows): not on Home. */
+    suspend fun counts(libraries: List<Library>): Map<UUID, Int> = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        val counts = libraries.map { library -> async { library.id to count(session, library.id, library.kind) } }
+            .awaitAll()
+            .mapNotNull { (id, count) -> count?.let { id to it } }
+            .toMap()
+        if (counts.isNotEmpty()) {
+            // Nixie (tv-home-two-rows): read and written at once; the Libraries page counts a few libraries at a time.
+            _libraries.update { list -> list.map { it.withCount(counts) } }
+            _latestLibraries.update { list -> list.map { it.withCount(counts) } }
+        }
+        counts
+    }
+
+    private fun Library.withCount(counts: Map<UUID, Int>) = counts[id]?.let { copy(itemCount = it) } ?: this
+
+    override suspend fun resume(): List<BaseItemDto> = withContext(Dispatchers.IO) { resume(requireSession()) }
+
+    override suspend fun nextUp(): List<BaseItemDto> = withContext(Dispatchers.IO) { nextUp(requireSession()) }
+
+    // Nixie (tv-home-two-rows): latest, recentAlbums, favoriteSongs, favorites, liveChannels and counts are no longer
+    // parts of Home, which shows Continue watching and Up next only.
+    suspend fun latest(library: Library): List<MediaItem> = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        ageFilter.screen(latest(session, session.userId, library).map(MediaMapper(session.api)::item))
+    }
+
+    suspend fun recentAlbums(): List<MediaItem> = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        recentAlbums(session, MediaMapper(session.api))
+    }
+
+    suspend fun favoriteSongs(): List<MusicTrack> = withContext(Dispatchers.IO) {
+        val session = requireSession()
+        favoriteSongs(session, MediaMapper(session.api))
+    }
+
+    override suspend fun items(dtos: List<BaseItemDto>): List<MediaItem> {
+        if (dtos.isEmpty()) return emptyList()
+        val session = requireSession()
+        return ageFilter.screen(dtos.map(MediaMapper(session.api)::item))
+    }
+    // Nixie (tv-home-start) end.
 
     /** The TV channels for the Live TV rows, favorites first, otherwise in the server's order. */
     suspend fun liveChannels(): List<LiveChannel> =
@@ -146,9 +157,15 @@ class HomeRepository @Inject constructor(
             sortOrder = listOf(SortOrder.DESCENDING),
             limit = RECENT_SONGS,
             enableImages = false,
+            enableTotalRecordCount = false, // Nixie: no count it does not show (tv-home-start)
         ).content.items.mapNotNull { it.albumId }.distinct().take(ROW_LIMIT)
         if (albumIds.isEmpty()) return emptyList()
-        val albums = session.api.libraryApi.getItems(userId = session.userId, ids = albumIds, enableUserData = true)
+        val albums = session.api.libraryApi.getItems(
+            userId = session.userId,
+            ids = albumIds,
+            enableUserData = true,
+            enableTotalRecordCount = false, // Nixie (tv-home-start)
+        )
             .content.items.associateBy { it.id }
         return albumIds.mapNotNull { albums[it] }.map(mapper::item)
     }
@@ -167,7 +184,11 @@ class HomeRepository @Inject constructor(
             isFavorite = true,
             sortBy = listOf(ItemSortBy.DATE_CREATED),
             sortOrder = listOf(SortOrder.DESCENDING),
-            fields = FIELDS,
+            // Nixie: what a poster card shows, and no count (tv-home-start).
+            fields = NIXIE_CARD_FIELDS,
+            enableImageTypes = NIXIE_CARD_IMAGES,
+            imageTypeLimit = 1,
+            enableTotalRecordCount = false,
             enableUserData = true,
             limit = FAVORITES,
         ).content.items.map(mapper::item).let { ageFilter.screen(it) }
@@ -182,6 +203,7 @@ class HomeRepository @Inject constructor(
             fields = listOf(ItemFields.MEDIA_STREAMS),
             enableUserData = true,
             limit = FAVORITE_SONGS,
+            enableTotalRecordCount = false, // Nixie (tv-home-start)
         ).content.items.map(mapper::track)
 
     /**
@@ -215,6 +237,7 @@ class HomeRepository @Inject constructor(
             fields = FIELDS,
             enableUserData = true,
             limit = count,
+            enableTotalRecordCount = false, // Nixie (tv-home-start)
         ).content.items.map(mapper::item).let { ageFilter.screen(it) }
         val unwatched = settings.spotlightUnwatched
         val started = if (SpotlightSource.ContinueWatching in sources) {
@@ -246,8 +269,10 @@ class HomeRepository @Inject constructor(
         _liveTv.value = views.any { it.collectionType == CollectionType.LIVETV }
         views
             .mapNotNull { view -> view.collectionType.toLibraryKind()?.let { view to it } }
-            .map { (view, kind) -> async { mapper.library(view, kind, count(session, view.id, kind)) } }
-            .awaitAll()
+            // Nixie: no count here; counts() asks for them once Home's rows are in (tv-home-start).
+            .map { (view, kind) -> mapper.library(view, kind, null) }
+            // Nixie: library names tidied ("[HUB] Kids Movies" reads "Kids Movies"), unless two would read the same.
+            .let { list -> list.zip(TidyNames.libraries(list.map { it.name })) { lib, name -> lib.copy(name = name) } }
     }
 
     private suspend fun count(
@@ -271,17 +296,28 @@ class HomeRepository @Inject constructor(
         mediaTypes = listOf(MediaType.VIDEO),
         // Music videos play in the music player, from the start.
         excludeItemTypes = listOf(BaseItemKind.MUSIC_VIDEO),
-        fields = FIELDS,
+        // Nixie: one image of each kind, no count; the hero shows the focused card's overview and genre, no stream
+        // (tv-home-two-rows).
+        fields = NIXIE_HERO_FIELDS,
+        enableImageTypes = NIXIE_CARD_IMAGES,
+        imageTypeLimit = 1,
+        enableTotalRecordCount = false,
         enableUserData = true,
     ).content.items
 
     private suspend fun nextUp(session: Session): List<BaseItemDto> = session.api.showApi.getNextUp(
         userId = session.userId,
         limit = ROW_LIMIT,
-        fields = FIELDS,
+        fields = NIXIE_HERO_FIELDS, // Nixie (tv-home-two-rows): the hero shows the focused card's overview and genre
+        enableImageTypes = NIXIE_CARD_IMAGES, // Nixie: one image of each kind, no count (tv-home-start)
+        imageTypeLimit = 1,
+        enableTotalRecordCount = false,
         enableUserData = true,
         // Episodes already started are in the resume list.
         enableResumable = false,
+        // Nixie: 365 days back, and shows being watched again as Settings says (NixieHomeSettings).
+        nextUpDateCutoff = ContinueWatchingRules.nextUpCutoff(localNow()),
+        enableRewatching = settingsRepository.settings.value.nixieHome.rewatching,
     ).content.items
 
     private suspend fun latest(
@@ -292,7 +328,10 @@ class HomeRepository @Inject constructor(
         val items = session.api.libraryApi.getLatestMedia(
             userId = userId,
             parentId = library.id,
-            fields = FIELDS,
+            // Nixie: what a poster card shows (tv-home-start).
+            fields = NIXIE_CARD_FIELDS,
+            enableImageTypes = NIXIE_CARD_IMAGES,
+            imageTypeLimit = 1,
             enableUserData = true,
             limit = ROW_LIMIT,
         ).content
@@ -317,7 +356,11 @@ class HomeRepository @Inject constructor(
             session.api.libraryApi.getItems(
                 userId = userId,
                 ids = missing,
-                fields = FIELDS,
+                // Nixie: what a poster card shows, and no count (tv-home-start).
+                fields = NIXIE_CARD_FIELDS,
+                enableImageTypes = NIXIE_CARD_IMAGES,
+                imageTypeLimit = 1,
+                enableTotalRecordCount = false,
                 enableUserData = true,
             ).content.items.associateBy { it.id }
         }
@@ -360,6 +403,13 @@ class HomeRepository @Inject constructor(
         const val FAVORITE_SONGS = 100
         const val FAVORITES = 40
         val FIELDS = listOf(ItemFields.OVERVIEW, ItemFields.GENRES, ItemFields.MEDIA_STREAMS)
+
+        // Nixie (tv-home-start): a poster card's caption shows the first genre; its pictures are these three kinds.
+        val NIXIE_CARD_FIELDS = listOf(ItemFields.GENRES)
+        val NIXIE_CARD_IMAGES = listOf(ImageType.PRIMARY, ImageType.BACKDROP, ImageType.THUMB)
+
+        // Nixie (tv-home-two-rows): what the hero shows of the focused card besides what every item carries.
+        val NIXIE_HERO_FIELDS = listOf(ItemFields.OVERVIEW, ItemFields.GENRES)
     }
 }
 

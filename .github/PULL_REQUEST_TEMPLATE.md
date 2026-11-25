@@ -1,15 +1,20 @@
-<!-- Larger changes need an agreed issue first, see CONTRIBUTING.md. -->
+<!-- Anything larger than a small fix needs an agreed issue first: see CONTRIBUTING.md. -->
 
-## What does this change?
+## What this changes, and why
 
-<!-- Link the issue, e.g. "Closes #123". -->
+<!-- Link the issue, for example "Closes #123". -->
 
-## How was it tested?
+## How it was tested
 
-<!-- Device or emulator, Android version, Jellyfin server version.
+<!-- The box or emulator and its Android version, and the Jellyfin version: a test server, never someone else's.
+     For a change you can see: the themes you checked it in.
      For translations: the language, and whether you are a native speaker. -->
 
 ## Checklist
 
-- [ ] `./gradlew testDebugUnitTest lintDebug assembleDebug` passes
-- [ ] Navigated the change with a D-pad
+- [ ] `.\gradlew.bat testDebugUnitTest :app:testNixieDebugUnitTest detekt lintDebug lintNixieDebug :app:assembleNixieDebug` passes
+- [ ] Navigated the change with a D-pad (remote or emulator), not a mouse
+- [ ] Checked against the design rules in `docs/DESIGN-RULES.md`
+- [ ] A change to a Glacier file is a small hook marked `// Nixie:`, with its row in `DIVERGENCE.md`
+- [ ] New files have their REUSE entry (`REUSE.toml`)
+- [ ] No server address, user name or token in the code, tests, screenshots or logs

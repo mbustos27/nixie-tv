@@ -38,3 +38,9 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Nixie: the agent's work file and its earlier copies (kept at the root, never committed)
+/HANDOFF.md
+/docs/history/
+# Nixie: the release checker's build output (tools/release-check)
+/tools/release-check/target/

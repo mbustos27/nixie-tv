@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Nixie: the window before Compose draws is Drive-in's Night, so the app never flashes Glacier's blue. -->
+<resources>
+    <color name="glacier_void">#1A0710</color>
+    <color name="glacier_accent">#F96985</color>
+    <color name="glacier_ice">#F8EFF0</color>
+</resources>

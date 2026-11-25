@@ -76,6 +76,7 @@ import io.github.glacier_jellyfin.androidtv.core.data.settings.FolderSettings
 import io.github.glacier_jellyfin.androidtv.core.data.settings.HdAudioOutput
 import io.github.glacier_jellyfin.androidtv.core.data.settings.HomeRow
 import io.github.glacier_jellyfin.androidtv.core.data.settings.HomeRowChoice
+import io.github.glacier_jellyfin.androidtv.core.data.settings.HomeSettings
 import io.github.glacier_jellyfin.androidtv.core.data.settings.Language
 import io.github.glacier_jellyfin.androidtv.core.data.settings.MaxBitrate
 import io.github.glacier_jellyfin.androidtv.core.data.settings.SeekStep
@@ -132,6 +133,11 @@ import io.github.glacier_jellyfin.androidtv.update.megabytes
 import io.github.glacier_jellyfin.androidtv.update.message
 import io.github.glacier_jellyfin.androidtv.update.openStorePage
 import io.github.glacier_jellyfin.androidtv.update.publishedDate
+import io.github.mbustos27.nixie.tv.NixieThemes
+import io.github.mbustos27.nixie.tv.data.NixieHomeSettings
+import io.github.mbustos27.nixie.tv.data.TopBarLibraries
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.diagnostics.NixieReportScreen
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
@@ -668,6 +674,8 @@ fun SettingsScreen(onNavigate: (UiEvent.Navigate) -> Unit, viewModel: SettingsVi
         }
         pinPrompt?.let { PinDialog(it, onKey = viewModel.pin::key, onDismiss = viewModel.pin::dismiss) }
         state.diagnostics.share?.let { LogShareScreen(it, onClose = viewModel::closeShare) }
+        // Nixie (tv-1.0-r1): Report a problem's page.
+        state.diagnostics.report?.let { NixieReportScreen(it, onClose = viewModel::closeReport) }
     }
 }
 
@@ -763,6 +771,7 @@ private fun SettingCard(row: SettingRow) {
     }
 }
 
+// Nixie (tv-home-two-rows): Settings › Home without the hero's and the rows' groups (nixieTwoRowHome).
 @Composable
 private fun rows(
     state: SettingsUiState,
@@ -788,7 +797,7 @@ private fun rows(
         movingRow,
         onMovingRow,
         listFocus.getValue(ListDialog.LibraryCards),
-    ) { onOpenList(ListDialog.LibraryCards) }
+    ) { onOpenList(ListDialog.LibraryCards) }.nixieTwoRowHome()
 
     SettingsCategory.Playback -> playbackRows(state, viewModel)
 
@@ -822,6 +831,7 @@ private fun appearanceRows(
     } else {
         pluralStringResource(R.plurals.settings_rows_some, favoriteRows.size, shownRows, favoriteRows.size)
     }
+    // Nixie (tv-home-two-rows): the Collections and Libraries entries' names and lines below.
     val navGroup = SettingGroup(
         stringResource(R.string.settings_group_nav),
         navigation.entries.arranged(navIds).mapNotNull { entry ->
@@ -833,6 +843,8 @@ private fun appearanceRows(
                         NavTarget.Home -> R.string.nav_home
                         NavTarget.Favorites -> R.string.nav_favorites
                         NavTarget.LiveTv -> R.string.nav_live_tv
+                        NavTarget.Collections -> R.string.scope_collections
+                        NavTarget.Libraries -> R.string.nixie_nav_libraries
                         is NavTarget.Library -> target.kind.navTitle
                         else -> R.string.nav_home
                     },
@@ -843,6 +855,8 @@ private fun appearanceRows(
                         target == NavTarget.Home -> R.string.settings_nav_home_sub
                         target == NavTarget.Favorites -> R.string.settings_nav_favorites_sub
                         target == NavTarget.LiveTv -> R.string.settings_nav_live_tv_sub
+                        target == NavTarget.Collections -> R.string.nixie_settings_nav_collections_sub
+                        target == NavTarget.Libraries -> R.string.nixie_settings_nav_libraries_sub
                         else -> R.string.settings_nav_library_sub
                     },
                 ),
@@ -882,14 +896,30 @@ private fun appearanceRows(
         R.string.settings_accent_twilight,
         R.string.settings_accent_firn,
     )
+    // Nixie: the theme picker; the switch is live and keeps the focus on it (NixieThemes).
+    val context = LocalContext.current
+    val themes = NixieThemes.pickable()
+    val themeRow = SettingRow.Choice(
+        stringResource(R.string.nixie_settings_theme),
+        stringResource(R.string.nixie_settings_theme_sub),
+        themes.map { stringResource(NixieThemes.labelOf(it)) },
+        themes.indexOf(NixieTheme.current.id).coerceAtLeast(0),
+        onSelect = { i -> NixieThemes.choose(context, themes[i]) },
+    )
     return listOf(
         SettingGroup(
             stringResource(R.string.settings_group_look),
             listOf(
+                themeRow,
                 SettingRow.Swatches(
                     stringResource(R.string.settings_accent),
-                    stringResource(R.string.settings_accent_sub),
-                    Accent.entries.mapIndexed { i, accent -> Swatch(stringResource(names[i]), accent.main) },
+                    // Nixie: a theme with its own accent (Drive-in) says so; the swatches keep Glacier's colours.
+                    if (NixieTheme.tokens.ownAccent) {
+                        stringResource(R.string.nixie_settings_accent_theme)
+                    } else {
+                        stringResource(R.string.settings_accent_sub)
+                    },
+                    Accent.entries.mapIndexed { i, accent -> Swatch(stringResource(names[i]), accent.swatchMain) },
                     appearance.accent.ordinal,
                     onSelect = { i -> viewModel.updateAppearance { it.copy(accent = AccentColor.entries[i]) } },
                 ),
@@ -1055,7 +1085,7 @@ private fun homeRows(
                     enabled = on,
                 ),
             ),
-        ),
+        ).withNixieHero(home, viewModel), // Nixie: the hero rule picks the titles
         SettingGroup(
             stringResource(R.string.settings_group_rows),
             home.homeRows(libraryIds).filter(visible).mapNotNull { choice ->
@@ -1086,6 +1116,100 @@ private fun homeRows(
                     configureFocus = libraryCardsFocus.takeIf { row == HomeRow.Libraries },
                 )
             },
+        ),
+        nixieHomeGroup(state, viewModel) // Nixie: Continue watching and Up next (NixieHomeSettings)
+            .withNixieWatchNext(state, viewModel), // Nixie (tv-watchnext): Continue watching on the home screen
+        *nixieTopBarGroups(state, viewModel), // Nixie: starred libraries in the top bar (TopBarLibraries)
+    )
+}
+
+// Nixie: the hero rule (HeroRules) picks the titles: the sources and "only unwatched" give way to
+// an on/off switch.
+@Composable
+private fun SettingGroup.withNixieHero(home: HomeSettings, viewModel: SettingsViewModel): SettingGroup {
+    val sourceLabel = stringResource(R.string.settings_spot_source)
+    val unwatchedLabel = stringResource(R.string.settings_spot_unwatched)
+    val on = home.spotlightSources.isNotEmpty()
+    val hero = SettingRow.Toggle(
+        stringResource(R.string.nixie_hero),
+        stringResource(if (on) R.string.nixie_hero_sub else R.string.nixie_hero_off),
+        on,
+        onToggle = {
+            val sources = if (on) emptySet() else setOf(SpotlightSource.RecentlyAdded)
+            viewModel.updateHome { it.copy(spotlightSources = sources) }
+        },
+    )
+    return copy(rows = rows.filterNot { it.label == unwatchedLabel }.map { if (it.label == sourceLabel) hero else it })
+}
+
+// Nixie: up to three libraries starred for the top bar, kept per server and profile; none while none are known.
+@Composable
+private fun nixieTopBarGroups(state: SettingsUiState, viewModel: SettingsViewModel): Array<SettingGroup> {
+    val libraries by viewModel.libraries.collectAsStateWithLifecycle()
+    val starrable = libraries.filter { it.kind != LibraryKind.HomeVideos }
+    if (starrable.isEmpty()) return emptyArray()
+    val stars = state.profile.nixieHome.topBarLibraries.filter { id -> starrable.any { it.id.toString() == id } }
+    val rows = starrable.mapIndexed { i, library ->
+        val id = library.id.toString()
+        val starred = id in stars
+        // A row is keyed by its label: a second library of one name gets a number.
+        val same = starrable.take(i).count { it.name == library.name }
+        SettingRow.Toggle(
+            if (same == 0) library.name else "${library.name} ${same + 1}",
+            stringResource(
+                when {
+                    starred -> R.string.nixie_top_bar_starred
+                    stars.size >= TopBarLibraries.MAX -> R.string.nixie_top_bar_full
+                    else -> R.string.nixie_top_bar_star
+                },
+            ),
+            starred,
+            onToggle = {
+                viewModel.updateNixieHome { it.copy(topBarLibraries = TopBarLibraries.starred(stars, id, !starred)) }
+            },
+            enabled = starred || stars.size < TopBarLibraries.MAX,
+        )
+    }
+    return arrayOf(SettingGroup(stringResource(R.string.nixie_top_bar), rows))
+}
+
+/**
+ * Nixie (tv-home-two-rows): Home shows Continue watching, then Up next, and nothing else (the owner, 2026-11-22), and its
+ * hero shows the focused card: the hero's and the rows' settings had nothing left to change, so they are not offered.
+ */
+@Composable
+private fun List<SettingGroup>.nixieTwoRowHome(): List<SettingGroup> {
+    val gone = setOf(stringResource(R.string.settings_group_spotlight), stringResource(R.string.settings_group_rows))
+    return filterNot { it.title in gone }
+}
+
+// Nixie: the home stream's settings, after Glacier's rows.
+@Composable
+private fun nixieHomeGroup(state: SettingsUiState, viewModel: SettingsViewModel): SettingGroup {
+    val nixie = state.profile.nixieHome
+    val days = NixieHomeSettings.HideStaleChoices
+    return SettingGroup(
+        stringResource(R.string.home_continue_watching),
+        listOf(
+            SettingRow.Choice(
+                stringResource(R.string.nixie_settings_hide_stale),
+                stringResource(R.string.nixie_settings_hide_stale_sub),
+                days.map { day ->
+                    if (day == 0) {
+                        stringResource(R.string.nixie_settings_never)
+                    } else {
+                        stringResource(R.string.nixie_settings_days, day)
+                    }
+                },
+                days.indexOf(nixie.hideStaleDays).coerceAtLeast(0),
+                onSelect = { i -> viewModel.updateNixieHome { it.copy(hideStaleDays = days[i]) } },
+            ),
+            SettingRow.Toggle(
+                stringResource(R.string.nixie_settings_rewatching),
+                stringResource(R.string.nixie_settings_rewatching_sub),
+                nixie.rewatching,
+                onToggle = { viewModel.updateNixieHome { it.copy(rewatching = !it.rewatching) } },
+            ),
         ),
     )
 }
@@ -1141,7 +1265,7 @@ private fun playbackRows(state: SettingsUiState, viewModel: SettingsViewModel): 
         },
         playback.skipButtonHide.ordinal,
         onSelect = { i -> viewModel.updatePlayback { it.copy(skipButtonHide = SkipButtonHide.entries[i]) } },
-    )
+    ) + nixieSkipRows(state, viewModel) // Nixie (play stream): where skips come from
 
     return listOf(
         SettingGroup(
@@ -1894,6 +2018,12 @@ private fun systemRows(state: SettingsUiState, viewModel: SettingsViewModel): Li
                     stringResource(R.string.settings_source_sub),
                     SOURCE_URL,
                 ),
+                // Nixie: the credit to Glacier, which Nixie for TV is built on.
+                info(
+                    stringResource(R.string.nixie_based_on),
+                    stringResource(R.string.nixie_based_on_sub),
+                    GLACIER_URL,
+                ),
                 info(
                     stringResource(R.string.settings_ffmpeg),
                     stringResource(R.string.settings_ffmpeg_sub),
@@ -1963,6 +2093,18 @@ private fun diagnosticsGroup(diagnostics: DiagnosticsState, viewModel: SettingsV
             runCatching { shareFocus.requestFocus() }
         }
     }
+    // Nixie (tv-1.0-r1): Report a problem's page gives the focus back to its "Show" in the same way.
+    val reportFocus = remember { FocusRequester() }
+    var reportOpened by remember { mutableStateOf(false) }
+    LaunchedEffect(diagnostics.report) {
+        if (diagnostics.report != null) {
+            reportOpened = true
+        } else if (reportOpened) {
+            reportOpened = false
+            withFrameNanos { }
+            runCatching { reportFocus.requestFocus() }
+        }
+    }
     val sub = when {
         diagnostics.sentAs != null -> stringResource(R.string.diag_send_done_sub, diagnostics.sentAs)
 
@@ -1976,6 +2118,14 @@ private fun diagnosticsGroup(diagnostics: DiagnosticsState, viewModel: SettingsV
     return SettingGroup(
         stringResource(R.string.settings_group_diagnostics),
         listOf(
+            // Nixie (tv-1.0-r1): Report a problem first, a code for the public form (NixieReportProblem).
+            SettingRow.Action(
+                stringResource(R.string.nixie_report),
+                stringResource(R.string.nixie_report_sub),
+                stringResource(R.string.diag_share_button),
+                onClick = viewModel::showReport,
+                focus = reportFocus,
+            ),
             // Stays enabled while sending: a disabled button would lose the focus.
             SettingRow.Action(
                 stringResource(R.string.diag_send),
@@ -2222,4 +2372,45 @@ private fun deviceSummary(context: Context): DeviceSummary {
 /** "https://jellyfin.example.org:8920" -> "jellyfin.example.org:8920". */
 private fun hostOf(address: String): String = address.substringAfter("://").trimEnd('/')
 
-private const val SOURCE_URL = "github.com/Glacier-Jellyfin/glacier-androidtv"
+// Nixie: Nixie for TV's own repository (made before the first release); Glacier's below.
+private const val SOURCE_URL = "github.com/mbustos27/nixie-tv"
+private const val GLACIER_URL = "github.com/Glacier-Jellyfin/glacier-androidtv"
+
+// Nixie (play stream): skips from chapters, online lookups (off until switched on) and learned skips.
+@Composable
+private fun nixieSkipRows(state: SettingsUiState, viewModel: SettingsViewModel): List<SettingRow> {
+    val play = state.profile.nixiePlay
+    return listOf(
+        SettingRow.Toggle(
+            stringResource(R.string.nixie_settings_lookup_online),
+            stringResource(R.string.nixie_settings_lookup_online_sub),
+            play.lookupOnline,
+            onToggle = { viewModel.updateNixiePlay { it.copy(lookupOnline = !it.lookupOnline) } },
+        ),
+        SettingRow.Toggle(
+            stringResource(R.string.nixie_settings_learn_skips),
+            stringResource(R.string.nixie_settings_learn_skips_sub),
+            play.learnSkips,
+            onToggle = { viewModel.updateNixiePlay { it.copy(learnSkips = !it.learnSkips) } },
+        ),
+        SettingRow.Action(
+            stringResource(R.string.nixie_settings_forget_learned),
+            stringResource(R.string.nixie_settings_forget_learned_sub),
+            button = stringResource(R.string.nixie_settings_forget),
+            onClick = viewModel::forgetLearnedSkips,
+        ),
+    )
+}
+// Nixie (play stream) end.
+
+// Nixie (tv-watchnext): Continue watching on the TV's home screen (Android's Watch Next), after the group's rows.
+@Composable
+private fun SettingGroup.withNixieWatchNext(state: SettingsUiState, viewModel: SettingsViewModel): SettingGroup = copy(
+    rows = rows + SettingRow.Toggle(
+        stringResource(R.string.nixie_watchnext_setting),
+        stringResource(R.string.nixie_watchnext_setting_sub),
+        state.profile.nixieWatchNext.showOnHomeScreen,
+        onToggle = { viewModel.updateNixieWatchNext { it.copy(showOnHomeScreen = !it.showOnHomeScreen) } },
+    ),
+)
+// Nixie (tv-watchnext) end.

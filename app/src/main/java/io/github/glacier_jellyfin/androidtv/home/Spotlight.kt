@@ -3,6 +3,7 @@ package io.github.glacier_jellyfin.androidtv.home
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -69,6 +70,8 @@ import io.github.glacier_jellyfin.androidtv.ui.ProgressBar
 import io.github.glacier_jellyfin.androidtv.ui.episodeText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.play.playLabelText
 const val SpotlightHeight = 680
 
 /**
@@ -108,21 +111,37 @@ fun Spotlight(
             .focusProperties { onEnter = { playFocus.requestFocus() } }
             .focusGroup(),
     ) {
-        Crossfade(targetState = item.backdropUrl, animationSpec = tween(600), label = "backdrop") { url ->
-            KenBurns { Artwork(url, Modifier.fillMaxSize()) }
+        // Nixie: a theme's own hero backdrop (Drive-in: the outdoor screen at dusk); the info stays over it.
+        val backdrop = NixieTheme.slots.heroBackdrop
+        if (backdrop != null) {
+            backdrop(item.backdropUrl) { url, artModifier ->
+                Crossfade(targetState = url, animationSpec = tween(600), label = "backdrop") { shown ->
+                    KenBurns { Artwork(shown, artModifier) }
+                }
+            }
+        } else {
+            Crossfade(targetState = item.backdropUrl, animationSpec = tween(600), label = "backdrop") { url ->
+                KenBurns { Artwork(url, Modifier.fillMaxSize()) }
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .startGradient(0f to Color(0xF50A1420), 0.38f to Color(0xC20A1420), 0.72f to Color(0x1A0A1420)),
+            )
         }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .startGradient(0f to Color(0xF50A1420), 0.38f to Color(0xC20A1420), 0.72f to Color(0x1A0A1420)),
-        )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, GlacierColors.Void))),
-        )
+        // Nixie: a theme's own fade at the hero's foot, or none (NixieSlots.heroFade).
+        val fade = NixieTheme.slots.heroFade
+        if (fade != null) {
+            Canvas(Modifier.matchParentSize()) { fade() }
+        } else {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, GlacierColors.Void))),
+            )
+        }
         SpotlightInfo(
             item = item,
             onPlay = { onPlay(item) },
@@ -141,7 +160,13 @@ fun Spotlight(
                 .padding(start = 80.dp, bottom = 74.dp)
                 .width(900.dp),
         )
-        if (items.size > 1) {
+        // Nixie: a theme's own position marks (Cinematic: a thumbnail pager).
+        val marks = NixieTheme.slots.heroPositionMarks
+        if (items.size > 1 && marks != null) {
+            marks(items.size, index, progress, items.map { it.thumbUrl ?: it.backdropUrl }) { url, artModifier ->
+                Artwork(url, artModifier)
+            }
+        } else if (items.size > 1) {
             Row(
                 Modifier
                     .align(Alignment.BottomEnd)
@@ -167,7 +192,10 @@ private fun SpotlightInfo(
     val resuming = item.progress != null
     val isEpisode = item.kind == ItemKind.Episode
     Column(modifier, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        if (resuming) ResumeChip()
+        // Nixie: a theme's own kicker line in place of the chip.
+        if (resuming) {
+            NixieTheme.slots.heroKicker?.invoke(stringResource(R.string.home_continue_watching)) ?: ResumeChip()
+        }
         Text(
             if (isEpisode) item.parentTitle ?: item.title else item.title,
             style = GlacierText.display(76)
@@ -217,7 +245,8 @@ private fun SpotlightInfo(
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             val season = item.seasonNumber
             val episode = item.episodeNumber
-            val playLabel = when {
+            // Nixie: "Resume S1 E4", "Play S2 E1" for an episode; Glacier's label otherwise.
+            val playLabel = playLabelText(item) ?: when {
                 !resuming -> stringResource(R.string.hero_play)
 
                 isEpisode && season != null && episode != null -> stringResource(
@@ -291,7 +320,8 @@ private fun Dot(active: Boolean, progress: () -> Float?) {
             .drawBehind {
                 val bar = Size(size.width, 12.dp.toPx())
                 val top = Offset(0f, (size.height - bar.height) / 2)
-                val radius = CornerRadius(bar.height / 2)
+                // Nixie: no oblong pills in a theme with its own pill shape: a square-cornered mark.
+                val radius = CornerRadius(if (NixieTheme.tokens.pill != null) 2.dp.toPx() else bar.height / 2)
                 val filled = if (active) progress() else null
                 val track = when {
                     !active -> Color(0x4DE8F4F7)

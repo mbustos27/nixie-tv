@@ -11,6 +11,8 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.kover)
+    // Nixie: the baseline profile generator (:baselineprofile) and its consumer (:app).
+    id("androidx.baselineprofile") version "1.5.0" apply false
 }
 
 // Aggregated coverage report: ./gradlew koverHtmlReport koverXmlReport. No

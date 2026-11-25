@@ -29,6 +29,8 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.core.designsystem.focusScale
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.underline
 
 /** Edge to the check (start) or the hold mark (end); a little more than to the label, so neither crowds the rounded edge. */
 private val CHECK_EDGE = 14.dp
@@ -57,7 +59,9 @@ fun FilterChip(
     val focused by interaction.collectIsFocusedAsState()
     val sidePadding = if (height >= 52) 26.dp else 24.dp
     val holdMark = onLongClick != null && focused
-    val labelColor = when {
+    // Nixie: a theme's chip colours and its mark for the active chip (NixieSlots.browse.chip).
+    val look = NixieTheme.slots.browse.chip?.invoke(focused, active)
+    val labelColor = look?.foreground ?: when {
         focused -> GlacierColors.Void
         active -> GlacierColors.Ice
         else -> GlacierColors.Mist
@@ -68,7 +72,7 @@ fun FilterChip(
             .height(height.dp)
             .clip(PillShape)
             .background(
-                when {
+                look?.background ?: when {
                     focused -> accent
                     active -> accent.copy(alpha = 0.18f)
                     else -> GlacierColors.GlassFill
@@ -76,7 +80,7 @@ fun FilterChip(
             )
             .border(
                 2.dp,
-                if (focused) {
+                look?.border ?: if (focused) {
                     accent
                 } else if (active) {
                     accent.copy(alpha = 0.45f)
@@ -85,6 +89,7 @@ fun FilterChip(
                 },
                 PillShape,
             )
+            .then(look?.let { Modifier.underline(it.underline) } ?: Modifier)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,

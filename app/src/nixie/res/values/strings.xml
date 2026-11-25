@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: Glacier contributors -->
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Nixie: the rebrand. Every Glacier string that names the app, with Nixie's name (generated from Glacier's
+     strings.xml; after an upstream merge, any new string naming Glacier needs its line here). -->
+<resources>
+    <string name="app_name" translatable="false">Nixie</string>
+    <string name="setup_unsupported_body">%1$s runs Jellyfin %2$s. Nixie supports Jellyfin 12.0 and newer; some features may not work.</string>
+    <string name="profiles_server_line">%1$s · Jellyfin %2$s · Nixie %3$s</string>
+    <string name="home_exit_title">Quit Nixie?</string>
+    <string name="address_hint">Nixie tries HTTPS first, then HTTP, each on the default port and on %1$s. For another port, append %2$s.</string>
+    <string name="settings_accent_sub">Nine Nixie accents across the rainbow. They also tint the gradient in the background.</string>
+    <string name="settings_hd_audio_sub">How lossless sound reaches the receiver. Nixie sends the whole stream, also where Android sends only the DTS core. E-AC-3 also has the server convert what cannot go out as a bitstream: no Atmos, but surround where the device sends PCM in stereo only</string>
+    <string name="settings_hd_audio_glacier">Nixie</string>
+    <string name="settings_sub_style_custom_sub">Nixie draws subtitles with the settings below</string>
+    <string name="settings_sub_font_sub">Default uses the Nixie font</string>
+    <string name="settings_start_picker_sub">Asks who\'s watching every time Nixie starts</string>
+    <string name="update_downloading_sub">Nixie stays usable meanwhile</string>
+    <string name="update_ready_sub">Nixie closes for the installation · the first time, Android asks for permission to install apps from Nixie</string>
+    <string name="update_current">Nixie is up to date</string>
+    <string name="update_unsupported_sub">Version %1$s is not a Nixie release</string>
+    <string name="update_error_package">The download is not the Nixie version the release announced</string>
+    <string name="update_bar_version">Nixie %1$s</string>
+    <string name="diag_send_crash_sub">Nixie closed unexpectedly on %1$s. Send the log so the error can be found.</string>
+    <string name="check_intro_body">Nixie plays %1$d short test files to see which picture and sound formats this device and your TV or sound system handle. The TV may switch picture modes and the sound system may show other formats. Your settings stay as they are.</string>
+    <string name="diag_crash_notice">Nixie closed unexpectedly. Send the log: Settings › System</string>
+    <string name="diag_crash_title">Nixie closed unexpectedly</string>
+    <string name="update_title">Nixie %1$s</string>
+    <string name="update_hint">↑↓ scroll the release notes · Nixie closes for the installation · later at any time under Settings › System</string>
+    <string name="update_installing_title">Installing Nixie %1$s …</string>
+    <string name="update_installing_hint">Nixie closes meanwhile and opens as usual afterwards</string>
+    <string name="update_downloading_title">Downloading Nixie %1$s …</string>
+    <string name="update_downloading_hint">Nixie installs the update right after. Back cancels the download.</string>
+    <!-- The About screen: the credit to Glacier (the licence's and the owner's wording). -->
+    <string name="settings_about_sub">Jellyfin client for Android TV · GPL-3.0-or-later. Nixie for TV is based on Glacier (github.com/Glacier-Jellyfin/glacier-androidtv) by its authors, under the GPL-3.0.</string>
+    <string name="settings_source_sub">The source code of Nixie for TV, on GitHub from its first release</string>
+    <!-- Nixie: the log goes only where the user chooses (the review, 2026-11-21): Nixie's own report form (Report a
+         problem, tv-1.0-r1) or whoever helps them; never Glacier's tracker. -->
+    <string name="diag_share_step_attach">The browser saves the log as a text file. Attach it to a report (Settings › System › Diagnostics › Report a problem), or share it with whoever helps you with Nixie</string>
+    <string name="player_error_log_body">Scan the code on the same network to save the log, then share it with whoever helps you with Nixie.</string>
+</resources>

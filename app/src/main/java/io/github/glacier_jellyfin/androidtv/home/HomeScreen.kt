@@ -1,31 +1,17 @@
 package io.github.glacier_jellyfin.androidtv.home
 
-import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,12 +24,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -51,46 +34,40 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
 import io.github.glacier_jellyfin.androidtv.R
 import io.github.glacier_jellyfin.androidtv.core.data.media.ItemKind
-import io.github.glacier_jellyfin.androidtv.core.data.media.Library
-import io.github.glacier_jellyfin.androidtv.core.data.media.LibraryKind
 import io.github.glacier_jellyfin.androidtv.core.data.media.MediaItem
-import io.github.glacier_jellyfin.androidtv.core.data.settings.HomeRow
-import io.github.glacier_jellyfin.androidtv.core.data.settings.arranged
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierColors
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.ModalSheet
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillButton
 import io.github.glacier_jellyfin.androidtv.core.designsystem.SpinningDiamond
 import io.github.glacier_jellyfin.androidtv.core.designsystem.blockKeysWhile
-import io.github.glacier_jellyfin.androidtv.core.designsystem.rememberRowPivotSpec
 import io.github.glacier_jellyfin.androidtv.core.updater.UpdateCandidate
 import io.github.glacier_jellyfin.androidtv.core.updater.WhatsNewPrompt
-import io.github.glacier_jellyfin.androidtv.library.libraryTitle
 import io.github.glacier_jellyfin.androidtv.navigation.LocalLibraryKinds
 import io.github.glacier_jellyfin.androidtv.navigation.NavTarget
 import io.github.glacier_jellyfin.androidtv.navigation.TopNav
 import io.github.glacier_jellyfin.androidtv.parental.PinDialog
-import io.github.glacier_jellyfin.androidtv.parental.showsLock
 import io.github.glacier_jellyfin.androidtv.settings.RestoreOfferDialog
 import io.github.glacier_jellyfin.androidtv.settings.RestoreViewModel
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
-import io.github.glacier_jellyfin.androidtv.ui.ContinueCard
-import io.github.glacier_jellyfin.androidtv.ui.ImagePageGround
-import io.github.glacier_jellyfin.androidtv.ui.LibraryCard
-import io.github.glacier_jellyfin.androidtv.ui.LocalCardSizes
 import io.github.glacier_jellyfin.androidtv.ui.LocalToaster
-import io.github.glacier_jellyfin.androidtv.ui.MediaRow
-import io.github.glacier_jellyfin.androidtv.ui.PosterCard
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
 import io.github.glacier_jellyfin.androidtv.ui.yearText
 import io.github.glacier_jellyfin.androidtv.update.UpdateDialog
 import io.github.glacier_jellyfin.androidtv.update.UpdateViewModel
 import io.github.glacier_jellyfin.androidtv.update.WhatsNewDialog
-import kotlin.math.roundToInt
+import io.github.mbustos27.nixie.tv.home.NixieHomePage
+import io.github.mbustos27.nixie.tv.home.NixieKeepRowsFocus
+import io.github.mbustos27.nixie.tv.home.NixieRemoveSheetHost
+import io.github.mbustos27.nixie.tv.home.NixieRow
+import io.github.mbustos27.nixie.tv.home.NixieRowsFocus
+import io.github.mbustos27.nixie.tv.home.nixieExitKeys
+import io.github.mbustos27.nixie.tv.home.rememberFocusHandoff
+import io.github.mbustos27.nixie.tv.home.rememberReturns
+import io.github.mbustos27.nixie.tv.home.requestFocusWhenReady
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalFoundationApi::class) // LocalBringIntoViewSpec
 @Composable
 fun HomeScreen(
     onNavigate: (UiEvent.Navigate) -> Unit,
@@ -102,45 +79,30 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     CollectEvents(viewModel.events, onNavigate)
+    // Nixie (tv-1.0-fixes): nobody signed in: "Who's watching?" or the server list instead (HomeViewModel.nixieLeave).
+    LaunchedEffect(state.nixieSignedOut) { if (state.nixieSignedOut) viewModel.nixieLeave() }
 
     val pinPrompt by viewModel.pin.prompt.collectAsStateWithLifecycle()
-    val playFocus = remember { FocusRequester() }
-    // Saved: coming back from a detail page shows the same title again.
-    var spotIndex by rememberSaveable { mutableIntStateOf(0) }
+    // Nixie: Remove from Continue watching, with an Undo.
+    val nixiePending by viewModel.nixieRemovals.pending.collectAsStateWithLifecycle()
+    val nixieRemoveAsk by viewModel.nixieRemoveAsk.collectAsStateWithLifecycle()
     val listFocus = remember { FocusRequester() }
-    val spotlight = state.spotlight
+    // Home is the bottom of the stack: Back asks before it closes the app (declared here, Nixie TV-S10: the
+    // focus moves below leave the dialog alone).
+    var exitAsked by remember { mutableStateOf(false) }
+    // Nixie (TV-S10): whether the focus is in "Quit Nixie?" yet; until then the dialog takes the keys (nixieExitKeys).
+    var exitFocused by remember { mutableStateOf(false) }
+    val nixieActivity = LocalActivity.current
 
-    // The spotlight moves on by itself, also while "Play" has the focus: it pauses only on
-    // "More info" and the favorite button, and after the user picked a title with Left/Right
-    // (until the focus leaves the spotlight). Any key in it starts the time anew.
-    var spotlightButton by remember { mutableStateOf<String?>(null) }
-    var pickedByHand by remember { mutableStateOf(false) }
-    var timerStart by remember { mutableIntStateOf(0) }
-    var switchedAt by remember { mutableLongStateOf(0L) }
-    val seconds = state.settings.spotlightRotation.seconds
-    val rotates = spotlight.size > 1 && seconds > 0
-    val paused = pickedByHand || spotlightButton == "info" || spotlightButton == "favorite"
-    val timer = remember { Animatable(0f) }
-    // Which timerStart the timer was last reset for: a pause keeps the time run so far.
-    val timerResetFor = remember { intArrayOf(-1) }
-    LaunchedEffect(rotates, paused, seconds, timerStart) {
-        if (timerResetFor[0] != timerStart || !rotates) {
-            timerResetFor[0] = timerStart
-            timer.snapTo(0f)
-        }
-        if (!rotates || paused) return@LaunchedEffect
-        timer.animateTo(1f, tween(((1f - timer.value) * seconds * 1000).roundToInt(), easing = LinearEasing))
-        switchedAt = SystemClock.uptimeMillis()
-        spotIndex = (spotIndex + 1) % spotlight.size
-        timerStart++
-    }
     // Arrived through the navigation (Back from a page, OK on "Home"): the focus stays on the bar's entry, also
     // when the content comes later, so no jump into the page meets a key the user already pressed. Down goes in.
     var navArrival by rememberSaveable { mutableStateOf(takeFocusNav()) }
     val navFocus = remember { FocusRequester() }
-    val listState = rememberLazyListState()
+    // Set by Back in the rows (and the top bar's Home back here): Down from the bar then starts at the first card, not
+    // at the card left in the rows.
+    var toTop by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    // Focus "Play" once, when the spotlight first appears (not when returning later). Not on a navigation arrival.
+    // The first focus goes into the rows once (not when returning later). Not on a navigation arrival.
     var initialFocusDone by rememberSaveable { mutableStateOf(navArrival) }
     // Back from another page the screen is composed anew; focus goes back to the element the
     // user left from (the lists keep their scroll), not to the nav on top.
@@ -149,40 +111,83 @@ fun HomeScreen(
     fun Modifier.remembered(key: String, restoreTo: String = key): Modifier = this
         .focusRequester(requesters.getOrPut(key) { FocusRequester() })
         .onFocusChanged { if (it.isFocused) lastFocus = restoreTo }
-    // "Continue watching" changed (back from the player, marked watched): the row starts at its
-    // left end again, where the title just watched now sits, and a focus in it goes along.
+    // Nixie: a card swapped in its place (Undo) takes the focus over (NixieHomeFocus).
+    val nixieHandoff = rememberFocusHandoff { requesters[it] }
     val continueRow = rememberLazyListState()
-    var continueIds by rememberSaveable { mutableStateOf<String?>(null) }
+    val upNextRow = rememberLazyListState() // Nixie (tv-home-two-rows)
     var inContinue by remember { mutableStateOf(false) }
-    val continueItems = state.content?.continueWatching
-    LaunchedEffect(continueItems?.joinToString(",") { it.id.toString() }) {
-        val ids = continueItems?.joinToString(",") { it.id.toString() } ?: return@LaunchedEffect
-        val before = continueIds
-        continueIds = ids
-        if (before == null || before == ids) return@LaunchedEffect
-        val first = continueItems.firstOrNull()?.let { "continue-${it.id}" }
-        if (lastFocus?.startsWith("continue-") == true) lastFocus = first
-        continueRow.scrollToItem(0)
-        if (inContinue && first != null) {
-            withFrameNanos { }
-            requesters[first]?.let { runCatching { it.requestFocus() } }
-        }
-    }
+    // Nixie: in every Nixie row the focus stays on the same title, or its neighbour, and the row is not
+    // scrolled back (NixieKeepRowsFocus): an Undo card running out or a live update must not move it.
+    val nixieRowsFocus = remember { NixieRowsFocus() }
+    NixieKeepRowsFocus(
+        state.content,
+        inRow = { row -> if (row == NixieRow.ContinueWatching) inContinue else nixieRowsFocus.has(row) },
+        lastFocus = { lastFocus },
+        setLastFocus = { lastFocus = it },
+        requester = { requesters[it] },
+    )
     val hasContent = state.content != null
+    // Nixie (tv-home-two-rows): whether the page has a card to focus; with none (both rows empty, or not in yet) the
+    // focus stays on the top bar, and Down from it goes nowhere.
+    val hasCards = state.content?.let { it.continueWatching.isNotEmpty() || it.upNext.isNotEmpty() } == true
+    // Nixie (tv-home-start): the moments Home is on screen, for the start's timings and the background work.
     LaunchedEffect(hasContent) {
         if (!hasContent) return@LaunchedEffect
+        withFrameNanos { }
+        viewModel.nixieTimes.onScreen()
+    }
+    LaunchedEffect(state.nixieSettled) {
+        if (!state.nixieSettled) return@LaunchedEffect
+        withFrameNanos { }
+        viewModel.nixieTimes.allOnScreen()
+    }
+    // Nixie (tv-home-two-rows): the first focus went to the top bar while no row had cards yet; until a key is
+    // pressed, the first card takes it once the rows come.
+    var nixieMayFocus by remember { mutableStateOf(false) }
+    // Nixie: also on a return to the front with Home still composed (a quick Back), and asking for a few
+    // frames, as a lazy row may draw the card a moment later (NixieHomeFocus).
+    val nixieReturns = rememberReturns { lastFocus }
+    LaunchedEffect(hasContent, nixieReturns.count) {
+        // Nixie (tv-home-two-rows): the top bar's Home came back to this Home (nixieBackToHome): what it shows stays,
+        // the focus goes to the bar as on an arrival, the rows start at their first card, and only they are asked again.
+        if (takeFocusNav()) {
+            navArrival = true
+            toTop = true
+            launch {
+                continueRow.scrollToItem(0)
+                upNextRow.scrollToItem(0)
+            }
+            viewModel.nixieBackHere()
+        }
+        if (!hasContent) return@LaunchedEffect
+        if (exitAsked) return@LaunchedEffect // Nixie (TV-S10): rows coming in never take the Quit dialog's focus
         if (navArrival) {
             // The loader's key block is gone with the content; the focus goes to the bar's entry for this page.
             withFrameNanos { }
             runCatching { navFocus.requestFocus() }
             return@LaunchedEffect
         }
-        if (!initialFocusDone) return@LaunchedEffect
+        if (!initialFocusDone) {
+            // Nixie (tv-home-two-rows): the first card (Continue watching's, else Up next's), else the bar until one
+            // comes. Wait one frame so the rows are attached before focusing them.
+            withFrameNanos { }
+            initialFocusDone = true
+            nixieMayFocus = !hasCards
+            if (!hasCards || !requestFocusWhenReady({ listFocus })) runCatching { navFocus.requestFocus() }
+            return@LaunchedEffect
+        }
+        val back = nixieReturns.leftFrom.takeIf { nixieReturns.count > 0 } ?: lastFocus
+        val restored = requestFocusWhenReady({ back?.let { requesters[it] } })
+        if (!restored && hasCards) runCatching { listFocus.requestFocus() }
+    }
+    // Nixie (tv-home-two-rows): cards that come after the first focus went to the bar take it, while no key was pressed.
+    LaunchedEffect(hasCards) {
+        val elsewhere = exitAsked || navArrival
+        if (!hasCards || !nixieMayFocus || elsewhere) return@LaunchedEffect
         withFrameNanos { }
-        val restored = lastFocus?.let { requesters[it] }?.let {
-            runCatching { it.requestFocus() }.getOrDefault(false)
-        } == true
-        if (!restored) runCatching { listFocus.requestFocus() }
+        if (!nixieMayFocus) return@LaunchedEffect
+        nixieMayFocus = false
+        requestFocusWhenReady({ listFocus })
     }
     // A dismissed PIN dialog gives focus back to the card that asked for it.
     var pinWasOpen by remember { mutableStateOf(false) }
@@ -228,25 +233,21 @@ fun HomeScreen(
             val restored = lastFocus?.let { requesters[it] }?.let {
                 runCatching { it.requestFocus() }.getOrDefault(false)
             } == true
-            if (!restored) runCatching { listFocus.requestFocus() }
+            if (!restored) runCatching { if (hasCards) listFocus.requestFocus() else navFocus.requestFocus() }
         }
         updateWasOpen = dialogOpen
     }
 
-    // Home is the bottom of the stack: Back asks before it closes the app.
-    var exitAsked by remember { mutableStateOf(false) }
     BackHandler(enabled = !exitAsked) { exitAsked = true }
-    // Back among the rows scrolls to the top and goes up to the navigation bar, so the page shows where it is.
+    // Back among the rows goes up to the navigation bar, so the page shows where it is.
     var inList by remember { mutableStateOf(false) }
-    // Set by that Back: Down from the bar then starts at the top, not at the card left in the rows.
-    var toTop by remember { mutableStateOf(false) }
     BackHandler(enabled = !exitAsked && inList) {
         toTop = true
         runCatching { navFocus.requestFocus() }
         scope.launch {
-            listState.scrollToItem(0)
-            // The first row would stay shifted sideways otherwise.
+            // The rows would stay shifted sideways otherwise.
             continueRow.scrollToItem(0)
+            upNextRow.scrollToItem(0)
         }
     }
     var exitWasOpen by remember { mutableStateOf(false) }
@@ -262,274 +263,62 @@ fun HomeScreen(
         exitWasOpen = exitAsked
     }
 
-    // The spotlight fades into the solid ground, so the page below it keeps that ground too.
     // A loader covers the page: the remote must not reach the navigation or anything else behind it.
     Box(
         Modifier
             .fillMaxSize()
-            .blockKeysWhile(state.loading && state.content == null, takeFocus = true)
-            .then(if (spotlight.isNotEmpty()) Modifier.background(ImagePageGround) else Modifier),
+            // Nixie (TV-S10): "Quit Nixie?" owns the remote from Back on, before its Quit has the focus.
+            .nixieExitKeys(asked = { exitAsked }, inDialog = { exitFocused }, quit = { nixieActivity?.finish() })
+            // Nixie (TV-S10): not while "Quit Nixie?" is open, whose buttons work whatever Home is doing.
+            .blockKeysWhile(state.loading && state.content == null && !exitAsked, takeFocus = true)
+            // Nixie (tv-home-two-rows): a key pressed keeps the focus where the user has it (nixieMayFocus).
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) nixieMayFocus = false
+                false
+            },
     ) {
         val content = state.content
-        val rows = state.settings
         when {
+            // Nixie (tv-1.0-fixes): no rows of a profile that is gone while Home gives way.
+            state.nixieSignedOut -> Unit
+
             state.loading && content == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 SpinningDiamond(110)
             }
 
             state.failed && content == null -> ErrorState(onRetry = viewModel::load)
 
-            content != null -> {
-                CompositionLocalProvider(
-                    LocalBringIntoViewSpec provides rememberRowPivotSpec(listState, SpotlightHeight),
-                ) {
-                    LazyColumn(
-                        state = listState,
-                        // Down from the nav returns to the last focused card.
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .onFocusChanged {
-                                inList = it.hasFocus
-                                if (it.hasFocus) {
-                                    toTop = false
-                                    navArrival = false
-                                }
-                            }
-                            .focusRequester(listFocus)
-                            .then(if (toTop) Modifier else Modifier.focusRestorer()),
-                    ) {
-                        item(key = "spotlight") {
-                            if (spotlight.isNotEmpty()) {
-                                Spotlight(
-                                    items = spotlight,
-                                    index = spotIndex.coerceIn(0, spotlight.lastIndex),
-                                    onSelect = {
-                                        spotIndex = it
-                                        pickedByHand = true
-                                    },
-                                    onPlay = viewModel::play,
-                                    onInfo = viewModel::openDetails,
-                                    onFavorite = viewModel::toggleFavorite,
-                                    playFocus = playFocus,
-                                    progress = { if (rotates) timer.value else null },
-                                    modifier = Modifier
-                                        .onFocusChanged {
-                                            if (!it.hasFocus) {
-                                                spotlightButton = null
-                                                pickedByHand = false
-                                            }
-                                        }
-                                        .onPreviewKeyEvent { event ->
-                                            // OK right after the title changed by itself was meant for the one before.
-                                            val justSwitched = SystemClock.uptimeMillis() - switchedAt < SWITCH_GRACE_MS
-                                            if (justSwitched && event.key in ConfirmKeys) return@onPreviewKeyEvent true
-                                            if (event.type == KeyEventType.KeyDown) timerStart++
-                                            false
-                                        },
-                                    // Coming back from another page lands on "Play" as well.
-                                    buttonModifier = { key ->
-                                        Modifier
-                                            .remembered("spotlight-$key", restoreTo = "spotlight-play")
-                                            .onFocusChanged { if (it.isFocused) spotlightButton = key }
-                                    },
-                                )
-                                LaunchedEffect(Unit) {
-                                    if (!initialFocusDone) {
-                                        // Wait one frame so the button is attached before focusing it.
-                                        withFrameNanos { }
-                                        initialFocusDone = runCatching { playFocus.requestFocus() }.isSuccess
-                                    }
-                                }
-                            } else {
-                                Box(Modifier.padding(top = 160.dp))
-                                // Spotlight switched off: the first row takes the first focus.
-                                LaunchedEffect(Unit) {
-                                    if (!initialFocusDone) {
-                                        withFrameNanos { }
-                                        initialFocusDone = runCatching { listFocus.requestFocus() }.isSuccess
-                                    }
-                                }
-                            }
-                        }
-                        rows.homeRows(content.latestLibraries.map { it.id.toString() }).forEach { choice ->
-                            if (choice.shown) {
-                                when (choice.row) {
-                                    HomeRow.ContinueWatching -> if (content.continueWatching.isNotEmpty()) {
-                                        item(key = "continue") {
-                                            MediaRow(
-                                                title = stringResource(R.string.home_continue_watching),
-                                                state = continueRow,
-                                                modifier = Modifier.onFocusChanged { inContinue = it.hasFocus },
-                                            ) {
-                                                items(content.continueWatching, key = { it.id }) { item ->
-                                                    ContinueCard(
-                                                        title = if (item.kind == ItemKind.Episode) {
-                                                            item.parentTitle ?: item.title
-                                                        } else {
-                                                            item.title
-                                                        },
-                                                        subtitle = continueSubtitle(item),
-                                                        // The show's art, not the episode still (user decision).
-                                                        imageUrl = item.showThumbUrl ?: item.posterUrl,
-                                                        progress = item.progress,
-                                                        onClick = { viewModel.openContinueWatching(item) },
-                                                        modifier = Modifier.remembered("continue-${item.id}"),
-                                                        locked = item.showsLock(),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.Favorites -> if (content.favorites.isNotEmpty()) {
-                                        item(key = "favorites") {
-                                            MediaRow(title = stringResource(R.string.home_favorites)) {
-                                                items(content.favorites, key = { it.id }) { item ->
-                                                    PosterFor(
-                                                        item,
-                                                        onClick = { viewModel.openDetails(item) },
-                                                        modifier = Modifier.remembered("favorites-${item.id}"),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.Latest -> content.latest.firstOrNull {
-                                        it.first.id.toString() == choice.library
-                                    }?.let { (library, items) ->
-                                        item(key = "latest-${library.id}") {
-                                            MediaRow(
-                                                title = stringResource(
-                                                    R.string.home_new_in,
-                                                    libraryTitle(library, content.libraries),
-                                                ),
-                                                subtitle = libraryCount(library),
-                                            ) {
-                                                items(items, key = { it.id }) { item ->
-                                                    PosterFor(
-                                                        item,
-                                                        onClick = { viewModel.openDetails(item) },
-                                                        modifier = Modifier
-                                                            .remembered("latest-${library.id}-${item.id}"),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.RecentAlbums -> if (content.recentAlbums.isNotEmpty()) {
-                                        item(key = "recent-albums") {
-                                            MediaRow(title = stringResource(R.string.home_recent_albums)) {
-                                                items(content.recentAlbums, key = { it.id }) { album ->
-                                                    PosterFor(
-                                                        album,
-                                                        onClick = { viewModel.openDetails(album) },
-                                                        modifier = Modifier.remembered("recent-${album.id}"),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.FavoriteSongs -> if (content.favoriteSongs.isNotEmpty()) {
-                                        item(key = "favorite-songs") {
-                                            val favoritesTitle = stringResource(R.string.home_favorite_songs)
-                                            MediaRow(title = favoritesTitle) {
-                                                items(content.favoriteSongs, key = { it.id }) { track ->
-                                                    PosterCard(
-                                                        imageUrl = track.coverUrl,
-                                                        caption = track.artist.orEmpty(),
-                                                        title = track.title,
-                                                        square = true,
-                                                        onClick = { viewModel.playFavorite(track, favoritesTitle) },
-                                                        modifier = Modifier.remembered("favorite-${track.id}"),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.Libraries -> {
-                                        val cards = rows.libraryCards.arranged(
-                                            content.libraries.map { it.id.toString() },
-                                        )
-                                            .filter { it.shown }
-                                            .mapNotNull { card ->
-                                                content.libraries.firstOrNull {
-                                                    it.id.toString() == card.id
-                                                }
-                                            }
-                                        if (cards.isNotEmpty()) {
-                                            item(key = "libraries") {
-                                                MediaRow(title = stringResource(R.string.home_my_media)) {
-                                                    items(cards, key = { it.id }) { library ->
-                                                        // Jellyfin's generated library images carry the name already;
-                                                        // a backdrop from the library reads like the design's photo.
-                                                        val newest = content.latest.firstOrNull {
-                                                            it.first.id == library.id
-                                                        }?.second?.firstOrNull()
-                                                        LibraryCard(
-                                                            name = libraryTitle(library, content.libraries),
-                                                            count = libraryCount(library),
-                                                            imageUrl =
-                                                                newest?.backdropUrl ?: newest?.posterUrl
-                                                                    ?: library.imageUrl,
-                                                            onClick = { viewModel.openLibrary(library) },
-                                                            modifier = Modifier.remembered("library-${library.id}"),
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.LiveTvOnNow -> {
-                                        val airing = content.liveChannels.filter { it.now != null }
-                                        if (airing.isNotEmpty()) {
-                                            item(key = "live-now") {
-                                                val nowMs = rememberLiveClock()
-                                                MediaRow(title = stringResource(R.string.home_live_now)) {
-                                                    items(airing, key = { it.id }) { channel ->
-                                                        OnNowCard(
-                                                            channel = channel,
-                                                            nowMs = nowMs,
-                                                            onClick = { viewModel.playChannel(channel) },
-                                                            modifier = Modifier.remembered("live-now-${channel.id}"),
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    HomeRow.LiveTvChannels -> if (content.liveChannels.isNotEmpty()) {
-                                        item(key = "live-channels") {
-                                            MediaRow(title = stringResource(R.string.home_live_channels)) {
-                                                items(content.liveChannels, key = { it.id }) { channel ->
-                                                    ChannelCard(
-                                                        channel = channel,
-                                                        onClick = { viewModel.playChannel(channel) },
-                                                        modifier = Modifier.remembered("live-channel-${channel.id}"),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    null -> Unit
-                                }
-                            }
-                        }
-                        // Room below the last row, whichever it is.
-                        item(key = "end") {
-                            Spacer(
-                                Modifier.height((LastRowBottom - LocalCardSizes.current.rowBottom).coerceAtLeast(0).dp),
-                            )
+            // Nixie (tv-home-two-rows): Continue watching, then Up next, on one page under the hero (NixieHomePage), in
+            // place of Glacier's scrolling spotlight and rows.
+            content != null -> NixieHomePage(
+                continueWatching = content.continueWatching,
+                upNext = content.upNext,
+                continueWatchingIn = state.nixieContinueWatchingIn,
+                upNextIn = state.nixieUpNextIn,
+                onOpen = viewModel::openContinueWatching,
+                onAskRemove = viewModel::nixieAskRemove,
+                onUndo = { item ->
+                    viewModel.nixieRemovals.undo(item.id)
+                    // The card comes back in the Undo card's place and takes its focus.
+                    nixieHandoff.give("continue-${item.id}")
+                },
+                rowsModifier = Modifier
+                    .onFocusChanged {
+                        inList = it.hasFocus
+                        if (it.hasFocus) {
+                            toTop = false
+                            navArrival = false
                         }
                     }
-                }
-            }
+                    .focusRequester(listFocus)
+                    .then(if (toTop) Modifier else Modifier.focusRestorer()),
+                pending = nixiePending.keys,
+                continueRow = continueRow,
+                upNextRow = upNextRow,
+                rowsFocus = nixieRowsFocus,
+                onContinueFocus = { inContinue = it },
+                cardModifier = { key -> Modifier.remembered(key) },
+            )
         }
 
         TopNav(
@@ -537,7 +326,8 @@ fun HomeScreen(
             kinds = LocalLibraryKinds.current,
             userName = state.userName,
             onSelect = viewModel::onNav,
-            down = listFocus,
+            // Nixie (tv-home-two-rows): nowhere to go down to without a card.
+            down = listFocus.takeIf { hasCards },
             focusRequester = navFocus,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -546,10 +336,25 @@ fun HomeScreen(
 
         if (exitAsked) {
             val activity = LocalActivity.current
-            ExitDialog(onCancel = { exitAsked = false }, onQuit = { activity?.finish() })
+            ExitDialog(
+                onCancel = {
+                    exitAsked = false
+                    exitFocused = false // Nixie (TV-S10)
+                },
+                onQuit = { activity?.finish() },
+                onFocus = { exitFocused = it }, // Nixie (TV-S10)
+            )
         }
 
         pinPrompt?.let { PinDialog(it, onKey = viewModel.pin::key, onDismiss = viewModel.pin::dismiss) }
+        // Nixie: holding OK on a Continue watching card.
+        NixieRemoveSheetHost(
+            nixieRemoveAsk,
+            onRemove = viewModel::nixieConfirmRemove,
+            onCancel = { viewModel.nixieAskRemove(null) },
+            // The card, or the Undo card in its place, takes the focus back.
+            returnTo = { requesters["continue-${it.id}"] },
+        )
 
         val installed = updates.updates.installed
         if (installed != null) {
@@ -573,45 +378,9 @@ fun HomeScreen(
     }
 }
 
-/** How long OK is ignored after the spotlight moved on by itself. */
-private const val SWITCH_GRACE_MS = 700L
-
-/** Space below the last row, as the bottom padding of a [MediaRow]. */
-private const val LastRowBottom = 90
-
-private val ConfirmKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
-
+/** A Continue watching card's second line: the episode and the minutes left, or the minutes left, or the year. */
 @Composable
-private fun PosterFor(
-    item: MediaItem,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    if (item.kind == ItemKind.Album) {
-        PosterCard(
-            imageUrl = item.posterUrl,
-            caption = item.parentTitle.orEmpty(),
-            title = item.title,
-            square = true,
-            onClick = onClick,
-            modifier = modifier,
-        )
-    } else {
-        PosterCard(
-            imageUrl = item.posterUrl,
-            // Title above year and genre, like the album cards.
-            caption = listOfNotNull(yearText(item), item.genres.firstOrNull()).joinToString(" · "),
-            title = item.title,
-            badge = item.unwatchedCount,
-            locked = item.showsLock(),
-            onClick = onClick,
-            modifier = modifier,
-        )
-    }
-}
-
-@Composable
-private fun continueSubtitle(item: MediaItem): String {
+internal fun continueSubtitle(item: MediaItem): String { // Nixie (tv-home-two-rows): internal, for NixieHomePage
     val season = item.seasonNumber
     val episode = item.episodeNumber
     val left = item.remainingMinutes
@@ -625,16 +394,6 @@ private fun continueSubtitle(item: MediaItem): String {
         left != null -> stringResource(R.string.minutes_left, left)
 
         else -> yearText(item).orEmpty()
-    }
-}
-
-@Composable
-private fun libraryCount(library: Library): String? {
-    val count = library.itemCount ?: return null
-    return when (library.kind) {
-        LibraryKind.Music -> pluralStringResource(R.plurals.count_albums, count, count)
-        LibraryKind.HomeVideos -> pluralStringResource(R.plurals.count_videos, count, count)
-        else -> pluralStringResource(R.plurals.count_titles, count, count)
     }
 }
 
@@ -662,14 +421,19 @@ private fun ErrorState(onRetry: () -> Unit) {
  * focus, so Back then OK leaves; a second Back closes the dialog instead.
  */
 @Composable
-private fun ExitDialog(onCancel: () -> Unit, onQuit: () -> Unit) {
+private fun ExitDialog(
+    onCancel: () -> Unit,
+    onQuit: () -> Unit,
+    onFocus: (Boolean) -> Unit = {}, // Nixie (TV-S10)
+) {
     ModalSheet(onDismiss = onCancel) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.home_exit_title), style = GlacierText.display(28), color = GlacierColors.Ice)
             Text(stringResource(R.string.home_exit_body), style = GlacierText.body(19), color = GlacierColors.Mist)
         }
         val quitFocus = remember { FocusRequester() }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Nixie (TV-S10): tells Home when the focus is in the dialog (nixieExitKeys).
+        Row(Modifier.onFocusChanged { onFocus(it.hasFocus) }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             PillButton(stringResource(R.string.action_cancel), onClick = onCancel)
             PillButton(
                 stringResource(R.string.home_exit_confirm),

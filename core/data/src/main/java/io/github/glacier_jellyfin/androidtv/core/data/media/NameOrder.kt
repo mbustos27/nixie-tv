@@ -25,6 +25,12 @@ object NameOrder : Comparator<String> {
      */
     fun title(name: String, sortName: String?): String {
         if (sortName.isNullOrBlank()) return name
+        // Nixie (fix round 2): symbols the server drops before the first letter ("&Me" sorts as "me", "¡Three" as
+        // "three") are dropped here too, so the rail files the title under the letter the server sorts it by; a sort
+        // name that keeps a symbol or a blank first ("#alive", "   dots") still files it under '#'.
+        if (sortName.first().isLetterOrDigit() && name.firstOrNull()?.isLetterOrDigit() == false) {
+            return title(name.trimStart { !it.isLetterOrDigit() }, sortName)
+        }
         val plain = loose(sortName)
         if (plain == loose(name)) return name
         val words = name.trim().split(' ', limit = 2)

@@ -17,6 +17,8 @@ sealed interface UiEvent {
         val replace: Boolean = false,
         val leaveTitles: Boolean = false,
         val focusNav: Boolean = false,
+        // Nixie (tv-fix-a): the server just removed; its pages leave the back stack (nixieDropServerPages).
+        val nixieDropServer: String? = null,
     ) : UiEvent
     data class Toast(@StringRes val message: Int, val args: List<Any> = emptyList()) : UiEvent
 }

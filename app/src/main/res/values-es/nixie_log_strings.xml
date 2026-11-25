@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_log_ask">¿Ofrecer el registro para descargarlo en esta red?</string>
+    <string name="nixie_log_ask_crash">Nixie se cerró inesperadamente el %1$s. ¿Ofrecer su registro para descargarlo en esta red?</string>
+    <string name="nixie_yes">Sí</string>
+    <string name="nixie_no">No</string>
+    <!-- tv-1.0-r1: Settings › System › Diagnostics › Report a problem (NixieReportProblem). -->
+    <string name="nixie_report">Informar de un problema</string>
+    <string name="nixie_report_sub">Muestra un código: escanéalo con el móvil para abrir el formulario de Nixie for TV en GitHub, con la versión de la app y la del servidor ya rellenadas. La TV no envía nada.</string>
+    <string name="nixie_report_step_scan">Escanea el código con el móvil. Abre el formulario «Report a problem» en GitHub, con la versión de esta app y la del servidor ya rellenadas.</string>
+    <string name="nixie_report_step_say">Cuenta qué pasó y cómo hacer que vuelva a pasar.</string>
+    <string name="nixie_report_step_log">Para añadir el registro, cierra esta página, elige «Descargar el registro en la red» y arrastra al formulario el archivo que guarda el móvil.</string>
+    <string name="nixie_report_app">Nixie for TV</string>
+    <string name="nixie_report_server">Servidor Jellyfin</string>
+    <string name="nixie_report_unknown">No se sabe</string>
+    <string name="nixie_report_hint">La TV no envía nada: el formulario se abre en el móvil y lo envías desde allí. No incluyas direcciones de servidor, nombres de usuario ni contraseñas.</string>
+</resources>

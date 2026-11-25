@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -66,6 +67,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.LeftToRight
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.ui.seasonLabel
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -253,8 +255,9 @@ private fun Clock(now: LocalTime, modifier: Modifier) {
  * The seek bar: buffered range, played range and a knob. Focused, Left/Right
  * move only the knob (scrubbing); the jump follows after a short pause or OK.
  */
+// Nixie (TV-S3): internal, so the trailer player has the same seek bar (TrailerScreen).
 @Composable
-private fun Timeline(
+internal fun Timeline(
     progress: PlayerProgress,
     scrubMs: Long?,
     chapters: List<Chapter>,
@@ -315,6 +318,17 @@ private fun Timeline(
                 .focusable(interactionSource = interaction),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // Nixie: a theme's seek bar (NixieSlots.player.seekBar); keys, scrubbing and preview stay Glacier's.
+            NixieTheme.slots.player.seekBar?.let { bar ->
+                bar(
+                    fraction(shown, duration),
+                    fraction(progress.bufferedMs, duration),
+                    focused,
+                    segments.map { fraction(it.startMs, duration)..fraction(it.endMs, duration) },
+                    chapters.drop(1).map { fraction(it.startMs, duration) },
+                )
+                return@BoxWithConstraints
+            }
             val trackHeight = if (focused) 12.dp else 7.dp
             val trackWidth = maxWidth
             Box(
@@ -379,6 +393,13 @@ private fun Timeline(
                     )
                 }
             }
+        }
+        // Nixie: a theme's times under the bar (NixieSlots.player.times).
+        NixieTheme.slots.player.times?.let { times ->
+            val remaining =
+                if (progress.durationMs > 0) "−" + formatTime(progress.durationMs - progress.positionMs) else null
+            times(formatTime(shown), chapterAt(chapters, progress.positionMs)?.name.orEmpty(), remaining)
+            return@Column
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(formatTime(shown), style = GlacierText.mono(20), color = GlacierColors.Ice)
@@ -573,10 +594,12 @@ private val SegmentHatch = Brush.linearGradient(
  * Glass behind OSD controls: the design's light glass, a step stronger. The
  * contrast on bright pictures comes from the darker scrims ([osdScrim]).
  */
-internal val OsdGlass = GlacierColors.GlassFill2
+// Nixie: read each time, so it follows the theme.
+internal val OsdGlass get() = GlacierColors.GlassFill2
 
 /** Secondary OSD text; lighter than Mist so it holds up over the picture. */
-internal val OsdSecondary = Color(0xFFC4D4DC)
+// Nixie: the theme's secondary text where it has one.
+internal val OsdSecondary get() = NixieTheme.tokens.mist.takeOrElse { Color(0xFFC4D4DC) }
 
 private fun fraction(value: Long, total: Long): Float = (value.toFloat() / total).coerceIn(0f, 1f)
 

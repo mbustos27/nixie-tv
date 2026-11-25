@@ -68,6 +68,14 @@ import io.github.glacier_jellyfin.androidtv.diagnostics.LogShare
 import io.github.glacier_jellyfin.androidtv.music.MusicController
 import io.github.glacier_jellyfin.androidtv.navigation.PlayerRoute
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.data.play.CreditsRule
+import io.github.mbustos27.nixie.tv.data.play.NextEpisodeRule
+import io.github.mbustos27.nixie.tv.data.skips.SkipChain
+import io.github.mbustos27.nixie.tv.data.skips.SkipSources
+import io.github.mbustos27.nixie.tv.play.PlayerReturn
+import io.github.mbustos27.nixie.tv.play.Standby
+import io.github.mbustos27.nixie.tv.play.StandbyOpen
+import io.github.mbustos27.nixie.tv.play.StartTiming
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
@@ -107,6 +115,8 @@ data class PlayerUiState(
     val logShare: LogShare? = null,
     /** The log could not be offered: the device has no network. */
     val logOffline: Boolean = false,
+    /** Nixie (integration 1): the failure card asks whether to offer the log on the network; nothing is served yet. */
+    val logAsk: Boolean = false,
     val method: PlaybackMethod? = null,
     val playing: Boolean = false,
     /** Playing or about to (buffering after a seek); drives the play/pause button. */
@@ -166,7 +176,12 @@ data class PlayerProgress(
 )
 
 /** The "Up next" card: time until the next episode starts and how much of the lead time is left. */
-data class UpNextCountdown(val remainingMs: Long, val leadMs: Long)
+data class UpNextCountdown(
+    val remainingMs: Long,
+    val leadMs: Long,
+    // Nixie: false when the next episode will not start by itself (the user's Jellyfin setting): a card without a countdown.
+    val autoPlay: Boolean = true,
+)
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -180,7 +195,12 @@ class PlayerViewModel @Inject constructor(
     private val musicPlayback: MusicController,
     private val versions: VersionChooser,
     private val diagnostics: Diagnostics,
+    // Nixie: skips from the chapters, online lookups and learned skips beside the server's (core/data skips).
+    private val skips: SkipChain,
 ) : ViewModel() {
+
+    // Nixie: learns a season's intro from the viewer's own skips.
+    private val learner = skips.learner()
 
     private val route = savedStateHandle.toRoute<PlayerRoute>()
 
@@ -220,6 +240,35 @@ class PlayerViewModel @Inject constructor(
     private var closing = false
     private var ticker: Job? = null
     private var opening: Job? = null
+
+    // Nixie (tv-player-4k, TV-S8): in the background the player lets go, and the screen comes back where it was, paused.
+    private val nixieSaved = savedStateHandle
+
+    /** The last open's arguments, repeated when the app went to the background before its first frame. */
+    private var nixieLastOpen: StandbyOpen? = null
+
+    /** The open that brings the title back when the app returns; null while the player is held. */
+    private var nixieRestore: StandbyOpen? = null
+
+    /** The next player starts paused. */
+    private var nixieStartPaused = false
+
+    // Nixie (tv-player-4k, design rule 10): each open's start, timed for the detailed log (durations only).
+    private var nixieTiming: StartTiming? = null
+
+    // Nixie (TV-S12): the launcher's card for the title held here brings it back here, opened once (PlayerReturn).
+    private val nixieHolder = PlayerReturn.Holder { itemId.takeUnless { closing || _state.value.failed } }
+
+    init {
+        // Nixie (TV-S8): a screen restored after its process went away in the background: its title, where it stood, paused.
+        Standby.take(savedStateHandle)?.let { (item, positionMs) ->
+            itemId = item
+            fromStart = false
+            startOverride = positionMs
+            nixieStartPaused = true
+        }
+        PlayerReturn.app.attach(nixieHolder) // Nixie (TV-S12)
+    }
 
     /** Segments already skipped automatically; seeking back into one plays it. */
     private val autoSkipped = mutableSetOf<MediaSegment>()
@@ -430,6 +479,12 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
+        // Nixie (rule 10): the first frame ends the open's timing.
+        override fun onRenderedFirstFrame() {
+            nixieTiming?.firstFrame()
+            PlayerReturn.app.firstFrame() // Nixie (TV-S12): the way back's line
+        }
+
         override fun onTracksChanged(tracks: Tracks) {
             if (tiers == null) startTiers(tracks)
             if (tracksPending) tracksPending = !applyTracks()
@@ -517,6 +572,8 @@ class PlayerViewModel @Inject constructor(
             }
         }
         load()
+        // Nixie: the user's autoplay setting, known before the title ends.
+        if (serverPreferences.preferences.value == null) viewModelScope.launch { serverPreferences.refresh() }
     }
 
     fun load() {
@@ -553,6 +610,8 @@ class PlayerViewModel @Inject constructor(
         retry: Boolean = false,
         snapStart: Boolean = false,
     ) {
+        nixieLastOpen = StandbyOpen(startMs, audio, subtitle, fromLastTitle, snapStart) // Nixie (TV-S8)
+        nixieTiming = StartTiming("Playback start") // Nixie (rule 10)
         opening?.cancel()
         opening = viewModelScope.launch {
             releasePlayer()
@@ -575,6 +634,7 @@ class PlayerViewModel @Inject constructor(
                     _state.update { it.copy(details = d) }
                     loadExtras(d)
                 }
+                nixieTiming?.mark("details") // Nixie (rule 10)
                 val start = startMs ?: if (fromStart) 0 else item.item.resumePositionMs
                 val remembered = if (fromLastTitle) {
                     val preferences = serverPreferences.preferences.value ?: serverPreferences.refresh()
@@ -588,6 +648,7 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     null
                 }
+                PlayerReturn.app.asked() // Nixie (TV-S12): counted on a way back
                 val opened = playback.open(
                     itemId,
                     start,
@@ -598,13 +659,17 @@ class PlayerViewModel @Inject constructor(
                     reuse = retry,
                 )
                 source = opened
+                nixieTiming?.mark("server answer") // Nixie (rule 10)
                 recordTracks(opened.audioIndex, opened.subtitleIndex)
                 val request = streamRequest(opened, start).copy(snapStart = snapStart)
                 val playback = GlacierPlayer.create(context, request)
+                PlayerReturn.app.prepared() // Nixie (TV-S12): counted on a way back
                 val player = playback.player
                 player.addListener(listener)
                 addDecoderListener(player)
-                player.playWhenReady = true
+                // Nixie (TV-S8): back from the background, the title waits paused where it was.
+                player.playWhenReady = !nixieStartPaused
+                nixieStartPaused = false
                 tracksPending = true
                 _state.update {
                     it.copy(
@@ -679,7 +744,17 @@ class PlayerViewModel @Inject constructor(
         val id = item.item.id
         viewModelScope.launch {
             val segments = playback.segments(id)
+                // Nixie: the chapters' and a learned skip for what the server has none of; online ones arrive later.
+                .let { skips.withLocalSources(item, it, policy) }
             if (id == itemId) _state.update { it.copy(segments = segments) }
+            val online = skips.lookupOnline(item, segments, policy)
+            if (online.isNotEmpty() && id == itemId) {
+                _state.update {
+                    it.copy(
+                        segments = SkipSources.withOnline(it.segments, online, SkipChain.wanted(policy)),
+                    )
+                }
+            }
         }
         val showId = item.seriesId
         if (item.item.kind == ItemKind.Episode && item.cast.isEmpty() && showId != null) {
@@ -726,6 +801,7 @@ class PlayerViewModel @Inject constructor(
     /** The skip button: jumps past the segment; skipping credits that run to the end starts the next episode. */
     fun skipSegment() {
         val segment = _progress.value.skip ?: return
+        learner.appSkip(segment, SystemClock.elapsedRealtime()) // Nixie: the app's own skip teaches nothing
         val next = _state.value.next
         val duration = _progress.value.durationMs
         if (next != null && duration > 0 && segment.endMs >= duration - END_TOLERANCE_MS) {
@@ -749,7 +825,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun onEnded() {
         val state = _state.value
-        val next = state.next
+        val next = state.next?.takeIf { autoPlaysNext() } // Nixie: the server's autoplay setting
         if (next != null && !state.upNextDismissed && policy.upNextAtMs(
                 state.segments,
                 _progress.value.durationMs,
@@ -1054,6 +1130,18 @@ class PlayerViewModel @Inject constructor(
 
     /** The length of the title, whatever stream plays. */
     private fun titleDuration(): Long = time.duration(_state.value.player?.duration?.coerceAtLeast(0) ?: 0)
+
+    // Nixie: whether the next episode starts by itself: the user's Jellyfin setting decides for a show's episodes (core/data
+    // NextEpisodeRule); a playlist's videos keep Glacier's rule.
+    private fun autoPlaysNext(): Boolean {
+        val episodes = queueOf == null && _state.value.isEpisode
+        val server = serverPreferences.preferences.value?.nextEpisodeAutoPlay.takeIf { episodes }
+        return NextEpisodeRule.playsByItself(server, policy.upNext)
+    }
+
+    // Nixie: desktop Nixie's credits rule (core/data CreditsRule).
+    private fun inClosingCredits(positionMs: Long): Boolean =
+        CreditsRule.stoppedInClosingCredits(positionMs, titleDuration(), _state.value.segments)
 
     /**
      * Opens the stream that takes over from the playing one at [HandoverPlan.At.atMs] and queues it in the player, which
@@ -1532,6 +1620,55 @@ class PlayerViewModel @Inject constructor(
         _state.value.player?.pause()
     }
 
+    /**
+     * Nixie (tv-player-4k, TV-S8): the app went to the background (Home, standby, the screensaver). The server learns
+     * where the title stands (its transcode ends) and the player is released; [nixieForeground] opens it again. Nothing
+     * happens on a screen that is closing or shows a failure.
+     */
+    fun nixieBackground() {
+        if (closing || nixieRestore != null || _state.value.failed) return
+        if (_state.value.player == null && opening?.isActive != true) return
+        val restore = if (started) {
+            StandbyOpen(
+                startMs = currentPositionMs(),
+                audio = _state.value.audioIndex,
+                subtitle = _state.value.subtitleIndex ?: NO_SUBTITLE,
+                fromLastTitle = false,
+                snapStart = false,
+            )
+        } else {
+            // Not playing yet: the open under way is made again as it was asked for.
+            nixieLastOpen ?: return
+        }
+        opening?.cancel()
+        source?.let { playback.reportStopped(it, restore.startMs ?: currentPositionMs()) }
+        source = null
+        releasePlayer()
+        _state.update { it.copy(loading = true, playing = false) }
+        nixieRestore = restore
+        restore.startMs?.let { Standby.save(nixieSaved, itemId, it) }
+        Log.i(
+            TAG,
+            "In the background: the player is released" + restore.startMs?.let { " at ${it / 1000} s" }.orEmpty(),
+        )
+    }
+
+    /** Nixie (TV-S8): back in front after [nixieBackground]: the same title, where it stood, paused. False when nothing was released. */
+    fun nixieForeground(): Boolean {
+        val restore = nixieRestore ?: return false
+        nixieRestore = null
+        Standby.take(nixieSaved)
+        nixieStartPaused = true
+        PlayerReturn.app.back() // Nixie (TV-S12): the way back is timed to its first frame
+        Log.i(
+            TAG,
+            "Back in front: opening the title again" + restore.startMs?.let { " at ${it / 1000} s" }.orEmpty() +
+                ", paused",
+        )
+        open(restore.startMs, restore.audio, restore.subtitle, restore.fromLastTitle, snapStart = restore.snapStart)
+        return true
+    }
+
     fun seekTo(positionMs: Long) {
         val player = _state.value.player ?: return
         val target = positionMs.coerceIn(0, titleDuration().takeIf { it > 0 } ?: Long.MAX_VALUE)
@@ -1564,7 +1701,9 @@ class PlayerViewModel @Inject constructor(
     private fun finish() {
         if (closing) return
         closing = true
-        source?.let { playback.reportStopped(it, currentPositionMs()) }
+        PlayerReturn.app.dropped() // Nixie (TV-S12)
+        // Nixie: stopping inside closing credits that run to the end counts as watched.
+        source?.let { currentPositionMs().let { at -> playback.reportStopped(it, at, watched = inClosingCredits(at)) } }
         source = null
         _finished.trySend(Unit)
     }
@@ -1577,6 +1716,18 @@ class PlayerViewModel @Inject constructor(
                 val player = _state.value.player ?: break
                 val position = time.position(player.currentPosition)
                 val duration = titleDuration()
+                // Nixie: the viewer's own skips teach the season's intro.
+                _state.value.details?.let { d ->
+                    val key = skips.learnedKey(d)
+                    learner.sample(
+                        itemId,
+                        key,
+                        position,
+                        _state.value.segments,
+                        skips.learnSkips,
+                        SystemClock.elapsedRealtime(),
+                    )
+                }
                 val segment = policy.active(_state.value.segments, position)
                 if (segment != null && policy.action(segment.kind) == SegmentAction.Skip && player.isPlaying) {
                     autoSkip(segment)
@@ -1609,12 +1760,14 @@ class PlayerViewModel @Inject constructor(
         val at = policy.upNextAtMs(state.segments, durationMs) ?: return null
         if (positionMs < at) return null
         val remaining = (durationMs - positionMs).coerceAtLeast(0)
-        return UpNextCountdown(remaining, (durationMs - at).coerceAtLeast(1))
+        // Nixie: without autoplay the card has no countdown.
+        return UpNextCountdown(remaining, (durationMs - at).coerceAtLeast(1), autoPlay = autoPlaysNext())
     }
 
     /** Once per segment; seeking back into it later plays it. */
     private fun autoSkip(segment: MediaSegment) {
         if (!autoSkipped.add(segment)) return
+        learner.appSkip(segment, SystemClock.elapsedRealtime()) // Nixie: the app's own skip teaches nothing
         seekTo(segment.endMs)
         viewModelScope.launch { _events.send(UiEvent.Toast(segment.kind.skippedMessage(), emptyList())) }
     }
@@ -1664,8 +1817,10 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        PlayerReturn.app.detach(nixieHolder) // Nixie (TV-S12)
         // Leaving without Stop (Home button, process going away) still records the resume point.
-        source?.let { playback.reportStopped(it, currentPositionMs()) }
+        // Nixie: inside closing credits that run to the end it counts as watched.
+        source?.let { currentPositionMs().let { at -> playback.reportStopped(it, at, watched = inClosingCredits(at)) } }
         releasePlayer()
         closeLogShare()
     }
@@ -1673,12 +1828,36 @@ class PlayerViewModel @Inject constructor(
     private var logServer: LogServer? = null
     private var sharing: Job? = null
 
+    // Nixie (integration 1): the question was answered for this failure (until the next open or retry).
+    private var logAnswered = false
+
     /**
-     * Shows the failure and offers the log on the local network at once, so a phone can fetch it
-     * for an issue straight from the dialog. The log already holds the failure, written just before.
+     * Shows the failure. Nixie (integration 1): the card asks whether to offer the log on the local network, so a
+     * phone can fetch it for a report straight from the dialog; nothing is served until Yes ([answerLog]). The log
+     * already holds the failure, written just before.
      */
     private fun fail(code: String, onDevice: Boolean) {
-        _state.update { it.copy(failed = true, failedOnDevice = onDevice, failureCode = code, loading = false) }
+        _state.update {
+            it.copy(
+                failed = true,
+                failedOnDevice = onDevice,
+                failureCode = code,
+                loading = false,
+                logAsk = !logAnswered && it.logShare == null && !it.logOffline,
+            )
+        }
+    }
+
+    /** Nixie (integration 1): the failure card's answer; Yes offers the log on the local network, No nothing. */
+    fun answerLog(yes: Boolean) {
+        if (!_state.value.logAsk) return
+        logAnswered = true
+        _state.update { it.copy(logAsk = false) }
+        if (yes && _state.value.failed) shareLog()
+    }
+
+    /** The log on the local network while the failure is shown; without a network, where to find it later. */
+    private fun shareLog() {
         if (logServer != null || sharing?.isActive == true) return
         sharing = viewModelScope.launch {
             val server = try {
@@ -1707,7 +1886,8 @@ class PlayerViewModel @Inject constructor(
         sharing = null
         logServer?.close()
         logServer = null
-        _state.update { it.copy(logShare = null, logOffline = false) }
+        logAnswered = false // Nixie (integration 1)
+        _state.update { it.copy(logShare = null, logOffline = false, logAsk = false) }
     }
 
     private companion object {

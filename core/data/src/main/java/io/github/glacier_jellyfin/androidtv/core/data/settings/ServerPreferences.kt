@@ -49,6 +49,8 @@ data class ServerPreferences(
     val subtitleLanguage: String? = null,
     val subtitleMode: SubtitleMode = SubtitleMode.Smart,
     val rememberSubtitles: Boolean = true,
+    // Nixie: the user's "play the next episode automatically" (EnableNextEpisodeAutoPlay), the same in every client.
+    val nextEpisodeAutoPlay: Boolean = true,
 )
 
 /** A language the server knows, for the language pickers. */
@@ -148,6 +150,7 @@ class ServerPreferencesRepository @Inject constructor(private val sessions: Sess
         subtitleLanguage = subtitleLanguagePreference?.takeIf { it.isNotBlank() },
         subtitleMode = SubtitleMode.entries.firstOrNull { it.api == subtitleMode } ?: SubtitleMode.Default,
         rememberSubtitles = rememberSubtitleSelections,
+        nextEpisodeAutoPlay = enableNextEpisodeAutoPlay, // Nixie
     )
 
     private fun UserConfiguration.with(preferences: ServerPreferences) = copy(

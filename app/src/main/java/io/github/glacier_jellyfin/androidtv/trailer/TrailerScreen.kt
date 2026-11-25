@@ -13,11 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,13 +22,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,9 +41,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -61,7 +54,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -106,7 +98,10 @@ import io.github.glacier_jellyfin.androidtv.detail.TrackPanel
 import io.github.glacier_jellyfin.androidtv.detail.TrackRow
 import io.github.glacier_jellyfin.androidtv.player.ControlButton
 import io.github.glacier_jellyfin.androidtv.player.LabelButton
+import io.github.glacier_jellyfin.androidtv.player.PlayerProgress
+import io.github.glacier_jellyfin.androidtv.player.Timeline
 import io.github.glacier_jellyfin.androidtv.player.formatTime
+import io.github.glacier_jellyfin.androidtv.player.osdScrim
 import io.github.glacier_jellyfin.androidtv.ui.Artwork
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
 import io.github.glacier_jellyfin.androidtv.ui.FactBadge
@@ -116,12 +111,16 @@ import io.github.glacier_jellyfin.androidtv.ui.UiEvent
 import io.github.glacier_jellyfin.androidtv.ui.ageRatingText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.trailer.TrailerWarmup
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
-/** The OSD hides after this long without input while playing (design: 5 s). */
-private const val OSD_TIMEOUT_MS = 5_000L
+/** The OSD hides after this long without input while playing (Nixie, TV-S3: the movie player's 3 s; Glacier: 5 s). */
+private const val OSD_TIMEOUT_MS = 3_000L
+
+/** Nixie (TV-S3): scrubbing the seek bar moves only the knob; the jump follows after this pause, as in the movie player. */
+private const val SCRUB_COMMIT_MS = 1_200L
 
 /**
  * When a YouTube trailer starts, the OSD leaves sooner, so the video reaches full
@@ -131,10 +130,6 @@ private const val YOUTUBE_OSD_TIMEOUT_MS = 2_000L
 
 /** The end screen takes focus after this pause. */
 private const val END_FOCUS_DELAY_MS = 600L
-
-/** The design's trailer skip buttons. */
-private const val SEEK_BACK_MS = 10_000L
-private const val SEEK_FORWARD_MS = 15_000L
 
 /**
  * Where a YouTube video sits while the OSD is shown, on the 1920×1080 grid:
@@ -158,7 +153,18 @@ fun TrailerScreen(
     LaunchedEffect(viewModel) { viewModel.finished.collect { onBack() } }
     CollectEvents(viewModel.events, onNavigate = onNavigate)
     BackHandler { viewModel.close() }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
+    // Nixie (tv-player-4k, design rule 5): a server file's player is released in the background and comes back paused.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        viewModel.pause()
+        viewModel.nixieBackground()
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.nixieForeground() }
+    // Nixie (TV-S9): the player the movie page made ahead waits for this screen, and goes if it is not taken.
+    DisposableEffect(Unit) {
+        TrailerWarmup.claim()
+        onDispose { TrailerWarmup.releaseClaimed() }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { TrailerWarmup.releaseClaimed() }
     val view = LocalView.current
     // Only while playback is meant to run: a paused, ended or failed screen lets the TV start its screensaver (OLED burn-in).
     val keepOn = state.playWhenReady && !state.ended && !state.failed
@@ -169,6 +175,7 @@ fun TrailerScreen(
 
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    val seekFocus = remember { FocusRequester() } // Nixie (TV-S3): the seek bar, as in the movie player
     val endFocus = remember { FocusRequester() }
     val errorFocus = remember { FocusRequester() }
     val subtitleFocus = remember { FocusRequester() }
@@ -184,20 +191,57 @@ fun TrailerScreen(
     var backDown by remember { mutableStateOf(false) }
     val osdShown = osdVisible && !stopped && current != null
 
-    fun showOsd() {
+    // Nixie (TV-S3): the movie player's rules (PlayerScreen): which control the OSD focuses when it shows, and the
+    // seek bar's scrub, a preview that jumps after a pause or OK.
+    var osdTarget by remember { mutableStateOf(playFocus) }
+    var scrubMs by remember { mutableStateOf<Long?>(null) }
+
+    fun showOsd(target: FocusRequester = osdTarget) {
+        osdTarget = target
         osdVisible = true
         interaction++
     }
 
+    // Nixie (TV-S3): pausing focuses the seek bar, ready to scrub; OK there plays on (as in the movie player).
+    fun togglePlay() {
+        val pausing = state.playWhenReady && !stopped && !state.loading
+        viewModel.togglePlay()
+        if (!pausing) return showOsd(playFocus)
+        if (osdShown) runCatching { seekFocus.requestFocus() }
+        showOsd(seekFocus)
+    }
+
+    fun scrub(deltaMs: Long) {
+        val duration = progress.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE
+        scrubMs = ((scrubMs ?: progress.positionMs) + deltaMs).coerceIn(0, duration)
+        interaction++
+    }
+
+    LaunchedEffect(scrubMs) {
+        val target = scrubMs ?: return@LaunchedEffect
+        delay(SCRUB_COMMIT_MS)
+        viewModel.seekTo(target)
+        scrubMs = null
+    }
     // Every new trailer and every pause brings the OSD back.
     LaunchedEffect(state.attempt) {
-        showOsd()
-        autoShown = true
+        scrubMs = null // Nixie: a scrub still waiting belongs to the trailer before
+        // Nixie (TV-S9): a YouTube trailer opens at its final size, full screen: shown with it, the controls would move it
+        // into the small frame and back ("opens small, then full screen"). They wait for a key; a server file's draw
+        // over the picture, as before.
+        if (youTube != null) {
+            osdVisible = false
+            autoShown = false
+        } else {
+            showOsd(playFocus)
+            autoShown = true
+        }
     }
     LaunchedEffect(state.playWhenReady) { if (!state.playWhenReady) showOsd() }
     // The subtitle menu keeps the OSD: without it the YouTube player would grow over the menu.
-    LaunchedEffect(osdVisible, interaction, state.playWhenReady, state.loading, state.subtitlesOpen) {
+    LaunchedEffect(osdVisible, interaction, state.playWhenReady, state.loading, state.subtitlesOpen, scrubMs) {
         if (osdVisible && state.playWhenReady && !state.loading && !state.subtitlesOpen) {
+            if (scrubMs != null) return@LaunchedEffect // Nixie (TV-S3): nor while a scrub waits, as in the movie player
             delay(if (youTube != null && autoShown) YOUTUBE_OSD_TIMEOUT_MS else OSD_TIMEOUT_MS)
             osdVisible = false
         }
@@ -206,7 +250,7 @@ fun TrailerScreen(
     LaunchedEffect(osdShown, state.attempt) {
         if (stopped) return@LaunchedEffect
         withFrameNanos { }
-        runCatching { (if (osdShown) playFocus else rootFocus).requestFocus() }
+        runCatching { (if (osdShown) osdTarget else rootFocus).requestFocus() }
     }
 
     Box(
@@ -215,7 +259,7 @@ fun TrailerScreen(
             .background(GlacierColors.Void)
             .focusRequester(rootFocus)
             // Same condition as the loading overlay: the OSD behind it must not react to the remote.
-            .blockKeysWhile(state.loading && !state.failed && current != null)
+            .blockKeysWhile(state.loading && !state.failed && !state.empty) // Nixie (TV-S9): from the first frame
             .onPreviewKeyEvent { event ->
                 // The subtitle menu handles its own keys, Back included.
                 if (state.subtitlesOpen) return@onPreviewKeyEvent false
@@ -232,29 +276,58 @@ fun TrailerScreen(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 interaction++
                 autoShown = false
+                // Nixie (TV-S3): the movie player's keys (PlayerScreen), where Glacier's design had any key only wake the
+                // OSD: OK plays or pauses, Left and Right scrub, Up, Down and Menu show the controls.
+                val hidden = !osdVisible && !stopped && current != null
                 when (event.key) {
                     Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> {
-                        viewModel.togglePlay()
+                        togglePlay()
                         true
                     }
 
                     Key.MediaRewind -> {
-                        viewModel.seekBy(-SEEK_BACK_MS)
+                        viewModel.seekBy(-state.seekBackMs)
                         true
                     }
 
                     Key.MediaFastForward -> {
-                        viewModel.seekBy(SEEK_FORWARD_MS)
+                        viewModel.seekBy(state.seekForwardMs)
                         true
                     }
 
-                    // With the OSD hidden, a key only wakes it (design).
-                    else -> if (!osdVisible && !stopped) {
-                        showOsd()
+                    // With the OSD hidden, Left/Right scrub straight away by the seek steps.
+                    Key.DirectionLeft, Key.DirectionRight -> if (hidden && !state.loading) {
+                        showOsd(seekFocus)
+                        scrub(if (event.key == Key.DirectionLeft) -state.seekBackMs else state.seekForwardMs)
                         true
                     } else {
                         false
                     }
+
+                    // With the OSD hidden, OK pauses like a click on the picture.
+                    Key.DirectionCenter, Key.Enter -> if (hidden) {
+                        togglePlay()
+                        true
+                    } else {
+                        false
+                    }
+
+                    Key.DirectionUp, Key.DirectionDown -> if (hidden) {
+                        showOsd(playFocus)
+                        true
+                    } else {
+                        false
+                    }
+
+                    // The menu key shows the controls, and keeps them up while they show.
+                    Key.Menu -> if (!stopped && current != null) {
+                        if (hidden) showOsd(playFocus)
+                        true
+                    } else {
+                        false
+                    }
+
+                    else -> false
                 }
             }
             .focusable(),
@@ -287,7 +360,15 @@ fun TrailerScreen(
                 progress = progress,
                 compactTitle = youTube != null,
                 playFocus = playFocus,
-                onTogglePlay = viewModel::togglePlay,
+                // Nixie (TV-S3): the movie player's seek bar and play button.
+                seekFocus = seekFocus,
+                scrubMs = scrubMs,
+                onScrub = ::scrub,
+                onCommitScrub = {
+                    scrubMs?.let(viewModel::seekTo)
+                    scrubMs = null
+                },
+                onTogglePlay = ::togglePlay,
                 onSeekBy = viewModel::seekBy,
                 onPlayTitle = viewModel::playTitle,
                 onFavorite = viewModel::toggleFavorite,
@@ -345,8 +426,9 @@ fun TrailerScreen(
             }
         }
 
-        if (state.loading && !state.failed && current != null) {
-            LoadingOverlay(trailerName(state, state.index), item?.title.orEmpty())
+        // Nixie (TV-S9): at full size from the screen's first frame, not only once the title's trailers are known.
+        if (state.loading && !state.failed && !state.empty) {
+            LoadingOverlay(if (current != null) trailerName(state, state.index) else "", item?.title.orEmpty())
         }
 
         if (state.failed || state.empty) {
@@ -372,6 +454,10 @@ private fun TrailerOsd(
     /** Leaves room for the YouTube player top right. */
     compactTitle: Boolean,
     playFocus: FocusRequester,
+    seekFocus: FocusRequester,
+    scrubMs: Long?,
+    onScrub: (Long) -> Unit,
+    onCommitScrub: () -> Unit,
     onTogglePlay: () -> Unit,
     onSeekBy: (Long) -> Unit,
     onPlayTitle: () -> Unit,
@@ -382,20 +468,9 @@ private fun TrailerOsd(
 ) {
     val item = state.item
     Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(Brush.verticalGradient(listOf(Color(0xD905090F), Color.Transparent))),
-        )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(560.dp)
-                .background(Brush.verticalGradient(0f to Color.Transparent, 0.7f to Color(0xF205090F))),
-        )
+        // Nixie (TV-S3): the movie player's shades, the theme's where it has one (NixieSlots.player.osdScrim).
+        Box(Modifier.align(Alignment.TopCenter).osdScrim(top = true))
+        Box(Modifier.align(Alignment.BottomCenter).osdScrim(top = false))
 
         Column(
             Modifier
@@ -436,7 +511,7 @@ private fun TrailerOsd(
         Row(
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = 80.dp, top = 64.dp),
+                .padding(end = 80.dp, top = 60.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -454,30 +529,32 @@ private fun TrailerOsd(
                     Text(rating, style = GlacierText.body(17), color = GlacierColors.Ice)
                 }
             }
-            Text(LocalTime.now().format(ClockFormat), style = GlacierText.mono(20), color = GlacierColors.Mist)
+            // Nixie (TV-S3): the movie player's clock.
+            Text(LocalTime.now().format(ClockFormat), style = GlacierText.display(34), color = GlacierColors.Ice)
         }
 
+        // Nixie (TV-S3): the movie player's bottom block (padding and gaps), seek bar and times.
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
-                .padding(start = 80.dp, end = 80.dp, bottom = 60.dp),
-            verticalArrangement = Arrangement.spacedBy(34.dp),
+                .padding(start = 80.dp, end = 80.dp, bottom = 72.dp),
+            verticalArrangement = Arrangement.spacedBy(30.dp),
         ) {
             LeftToRight {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProgressBar(progress, onSeekBy = onSeekBy, downFocus = playFocus)
-                    Row(Modifier.fillMaxWidth()) {
-                        Text(formatTime(progress.positionMs), style = GlacierText.mono(19), color = GlacierColors.Ice)
-                        Spacer(Modifier.weight(1f))
-                        if (progress.durationMs > 0) {
-                            Text(
-                                "−" + formatTime(progress.durationMs - progress.positionMs),
-                                style = GlacierText.mono(19),
-                                color = GlacierColors.Mist,
-                            )
-                        }
-                    }
-                }
+                Timeline(
+                    progress = PlayerProgress(positionMs = progress.positionMs, durationMs = progress.durationMs),
+                    scrubMs = scrubMs,
+                    chapters = emptyList(),
+                    segments = emptyList(),
+                    trickplay = null,
+                    imageHeaders = emptyMap(),
+                    focusRequester = seekFocus,
+                    downFocus = playFocus,
+                    seekBackMs = state.seekBackMs,
+                    seekForwardMs = state.seekForwardMs,
+                    onScrub = onScrub,
+                    onCommit = { if (scrubMs != null) onCommitScrub() else onTogglePlay() },
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -490,7 +567,7 @@ private fun TrailerOsd(
                         ControlButton(
                             GlacierIcons.Replay,
                             stringResource(R.string.player_rewind),
-                            onClick = { onSeekBy(-SEEK_BACK_MS) },
+                            onClick = { onSeekBy(-state.seekBackMs) }, // Nixie (TV-S3): the movie player's steps
                         )
                         ControlButton(
                             if (state.playWhenReady) GlacierIcons.Pause else GlacierIcons.Play,
@@ -501,8 +578,8 @@ private fun TrailerOsd(
                         )
                         ControlButton(
                             GlacierIcons.Forward,
-                            stringResource(R.string.trailer_forward),
-                            onClick = { onSeekBy(SEEK_FORWARD_MS) },
+                            stringResource(R.string.player_forward),
+                            onClick = { onSeekBy(state.seekForwardMs) },
                         )
                     }
                 }
@@ -606,75 +683,6 @@ private fun TrailerChip() {
             style = GlacierText.body(15, FontWeight.Bold).copy(letterSpacing = 0.09.em),
             color = accent,
         )
-    }
-}
-
-/** Focused, Left and Right skip like the buttons below it. */
-@Composable
-private fun ProgressBar(
-    progress: TrailerProgress,
-    onSeekBy: (Long) -> Unit,
-    downFocus: FocusRequester,
-) {
-    val accent = LocalAccent.current.main
-    val played = fraction(progress)
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(26.dp)
-            .focusProperties { down = downFocus }
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    Key.DirectionLeft -> {
-                        onSeekBy(-SEEK_BACK_MS)
-                        true
-                    }
-
-                    Key.DirectionRight -> {
-                        onSeekBy(SEEK_FORWARD_MS)
-                        true
-                    }
-
-                    else -> false
-                }
-            }
-            .focusable(interactionSource = interaction),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(if (focused) 10.dp else 6.dp)
-                .clip(PillShape)
-                .background(GlacierColors.GlassFill2),
-        ) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(played).clip(PillShape).background(accent))
-        }
-        if (progress.durationMs > 0) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val knob = if (focused) 22.dp else 16.dp
-                // Focused, a glow ring shows where the keys go (as in the player).
-                val ring = if (focused) 6.dp else 0.dp
-                Box(
-                    Modifier
-                        .offset(x = maxWidth * played - knob / 2 - ring)
-                        .size(knob + ring * 2)
-                        .background(if (focused) accent.copy(alpha = 0.3f) else Color.Transparent, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier
-                            .size(knob)
-                            .shadow(if (focused) 0.dp else 10.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(accent),
-                    )
-                }
-            }
-        }
     }
 }
 

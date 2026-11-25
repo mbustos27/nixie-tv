@@ -40,7 +40,8 @@ class ServerConnector @Inject constructor(
             val kept = accounts.current().users.filter { it.serverId == old.id }.mapNotNull { user ->
                 val token = user.accessToken ?: return@mapNotNull null
                 runSuspendCatching {
-                    authenticator.tokenUserId(server.address, token)
+                    // Nixie: asked as the profile's own device id (DeviceIds).
+                    authenticator.tokenUserId(server.address, token, user.deviceId)
                 }.getOrNull()?.let { user.userId to it }
             }.toMap()
             accounts.replaceServer(old.id, server, kept)

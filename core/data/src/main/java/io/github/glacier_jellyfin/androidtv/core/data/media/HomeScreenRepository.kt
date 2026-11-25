@@ -2,6 +2,11 @@ package io.github.glacier_jellyfin.androidtv.core.data.media
 
 import io.github.glacier_jellyfin.androidtv.core.data.AccountRepository
 import io.github.glacier_jellyfin.androidtv.core.data.StoredUser
+import io.github.mbustos27.nixie.tv.data.ContinueWatchingRules
+import io.github.mbustos27.nixie.tv.data.localNow
+import io.github.mbustos27.nixie.tv.data.watchnext.WatchNextProfiles
+import io.github.mbustos27.nixie.tv.data.watchnext.WatchNextRules
+import io.github.mbustos27.nixie.tv.jellyfin.deviceFor
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -60,24 +65,33 @@ data class HomeScreenContent(
 class HomeScreenRepository @Inject constructor(
     private val jellyfin: Jellyfin,
     private val accounts: AccountRepository,
+    // Nixie (tv-watchnext): whose titles, and that profile's settings (WatchNextProfiles).
+    private val nixieProfiles: WatchNextProfiles,
 ) {
     /** Null when no profile on this device is signed in. */
     suspend fun load(): HomeScreenContent? = withContext(Dispatchers.IO) {
         val state = accounts.current()
-        val user =
-            state.users.filter { it.accessToken != null }.maxByOrNull { it.lastUsedAt } ?: return@withContext null
+        // Nixie (tv-watchnext): only the profile that opened in Nixie last, while signed in (WatchNextOwner).
+        val user = nixieProfiles.owner() ?: return@withContext null
+        val nixieSettings = nixieProfiles.settingsOf(user)
         val server = state.servers.firstOrNull { it.id == user.serverId } ?: return@withContext null
-        val api = jellyfin.createApi(baseUrl = server.address, accessToken = user.accessToken)
+        // Nixie: as the profile's own device id (DeviceIds).
+        val api = jellyfin.createApi(
+            baseUrl = server.address,
+            accessToken = user.accessToken,
+            deviceInfo = jellyfin.deviceFor(user.deviceId),
+        )
         val userId = UUID.fromString(user.userId)
         val mapper = MediaMapper(api)
         coroutineScope {
             val resume = async { resume(api, userId) }
-            val nextUp = async { nextUp(api, userId) }
+            val nextUp = async { nextUp(api, userId, nixieSettings.nixieHome.rewatching) }
             val added = async { recentlyAdded(api, userId) }
             val releases = async { recentReleases(api, userId) }
             val started = resume.await()
             val startedIds = started.mapTo(HashSet()) { it.id }
-            val continueWatching = mergeContinueWatching(started, nextUp.await())
+            // Nixie (tv-watchnext): Nixie's Continue watching, then Up next, or nothing when switched off (WatchNextRules).
+            val continueWatching = WatchNextRules.titles(started, nextUp.await(), nixieSettings, localNow())
             val recentlyAdded = added.await()
             val recentReleases = releases.await()
             val blocked = blocked(
@@ -131,13 +145,20 @@ class HomeScreenRepository @Inject constructor(
         enableUserData = true,
     ).content.items
 
-    private suspend fun nextUp(api: ApiClient, userId: UUID): List<BaseItemDto> = api.showApi.getNextUp(
+    private suspend fun nextUp(
+        api: ApiClient,
+        userId: UUID,
+        rewatching: Boolean,
+    ): List<BaseItemDto> = api.showApi.getNextUp(
         userId = userId,
         limit = LIMIT,
         fields = FIELDS,
         enableUserData = true,
         // Episodes already started are in the resume list.
         enableResumable = false,
+        // Nixie (tv-watchnext): as Home's Up next, 365 days back and shows watched again as Settings says.
+        nextUpDateCutoff = ContinueWatchingRules.nextUpCutoff(localNow()),
+        enableRewatching = rewatching,
     ).content.items
 
     /**

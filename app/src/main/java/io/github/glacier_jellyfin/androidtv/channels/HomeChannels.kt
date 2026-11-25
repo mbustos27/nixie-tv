@@ -21,6 +21,8 @@ import io.github.glacier_jellyfin.androidtv.core.data.media.HomeScreenTitle
 import io.github.glacier_jellyfin.androidtv.core.data.media.ItemKind
 import io.github.glacier_jellyfin.androidtv.core.log.Log
 import io.github.glacier_jellyfin.androidtv.settings.UiLocale
+import io.github.mbustos27.nixie.tv.channels.WatchNextIds
+import io.github.mbustos27.nixie.tv.channels.WatchNextStore
 
 /**
  * Writes [HomeScreenContent] to the Android TV home screen: "Watch next" and
@@ -110,40 +112,32 @@ internal class HomeChannels(context: Context) {
     }
 
     private fun writeWatchNext(content: HomeScreenContent?) {
-        val existing = query(
-            TvContractCompat.WatchNextPrograms.CONTENT_URI,
-            WatchNextProgram.PROJECTION,
-            WatchNextProgram::fromCursor,
-        )
-            .associateBy { it.internalProviderId }
-        val titles = content?.continueWatching.orEmpty()
-        val now = System.currentTimeMillis()
-        if (content != null) {
-            titles.forEachIndexed { index, title ->
-                val old = existing[title.item.id.toString()]
-                val builder = WatchNextProgram.Builder()
-                    .setWatchNextType(
-                        if (title.nextUp) TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT else TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE,
-                    )
-                    // Next episodes have not been played; they keep the server's order behind the started titles.
-                    .setLastEngagementTimeUtcMillis(title.lastPlayedAt ?: (now - index * 1000L))
-                    .describe(title, content, wide = true)
-                if (old == null) {
-                    helper.publishWatchNextProgram(builder.build())
-                } else {
-                    // Removed by the user: back once it was watched further.
-                    if (!old.isBrowsable &&
-                        old.lastPlaybackPositionMillis != title.item.resumePositionMs.toInt()
-                    ) {
-                        builder.setBrowsable(true)
-                    }
-                    helper.updateWatchNextProgram(builder.build(), old.id)
-                }
-            }
+        // Nixie (tv-watchnext): one profile's rows, each title once, the rows of anyone else gone (WatchNextStore).
+        val owner = content?.let(WatchNextIds::owner)
+        WatchNextStore(resolver).replaceAll(owner, content?.let(::watchNextPrograms).orEmpty())
+    }
+
+    /**
+     * Nixie (tv-watchnext): Glacier's Watch Next program for each title, with the profile in its id
+     * (WatchNextIds) and an intent that plays it from where it was left (HomeLaunch.play).
+     */
+    internal fun watchNextPrograms(content: HomeScreenContent): List<WatchNextProgram> {
+        val titles = content.continueWatching
+        val owner = WatchNextIds.owner(content)
+        // Next episodes have not been played; they keep the server's order behind the started titles.
+        val behind = titles.mapNotNull { it.lastPlayedAt }.minOrNull() ?: System.currentTimeMillis()
+        return titles.mapIndexed { index, title ->
+            val id = title.item.id.toString()
+            WatchNextProgram.Builder()
+                .setWatchNextType(
+                    if (title.nextUp) TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT else TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE,
+                )
+                .setLastEngagementTimeUtcMillis(title.lastPlayedAt ?: (behind - (index + 1) * 1000L))
+                .describe(title, content, wide = true)
+                .setInternalProviderId(WatchNextIds.of(owner, id))
+                .setIntent(HomeLaunch(content.serverId, content.userId, id, play = true).intent(context))
+                .build()
         }
-        val wanted = titles.mapTo(HashSet()) { it.item.id.toString() }
-        existing.values.filterNot { it.internalProviderId in wanted }
-            .forEach { resolver.delete(TvContractCompat.buildWatchNextProgramUri(it.id), null, null) }
     }
 
     private fun <B : BasePreviewProgram.Builder<B>> B.describe(

@@ -36,6 +36,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -85,6 +87,11 @@ import io.github.glacier_jellyfin.androidtv.music.MINI_PLAYER_TOP
 import io.github.glacier_jellyfin.androidtv.music.MiniPlayer
 import io.github.glacier_jellyfin.androidtv.ui.PageEdge
 import io.github.glacier_jellyfin.androidtv.ui.TOAST_WIDTH
+import io.github.mbustos27.nixie.tv.designsystem.NavEntryLook
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.nixieShadow
+import io.github.mbustos27.nixie.tv.home.isOwnStarredPage
+import io.github.mbustos27.nixie.tv.home.nixieTopBar
 
 /** The library kinds the server has (HomeRepository.kinds): one navigation entry each. */
 val LocalLibraryKinds = staticCompositionLocalOf { listOf(LibraryKind.Movies, LibraryKind.Shows, LibraryKind.Music) }
@@ -104,13 +111,25 @@ val LocalProfileImage = staticCompositionLocalOf<String?> { null }
 sealed interface NavTarget {
     data object Search : NavTarget
     data object Home : NavTarget
-    data class Library(val kind: LibraryKind) : NavTarget
+
+    // Nixie: [libraryId] and [name] for a starred library's own entry (NixieTopBar); null for a kind's entry.
+    data class Library(
+        val kind: LibraryKind,
+        val libraryId: String? = null,
+        val name: String? = null,
+    ) : NavTarget
 
     /** The channels of the server's Live TV. */
     data object LiveTv : NavTarget
 
     /** Everything marked with the heart. */
     data object Favorites : NavTarget
+
+    // Nixie (tv-home-two-rows): every collection on the server (box sets), after the libraries.
+    data object Collections : NavTarget
+
+    // Nixie (tv-home-two-rows): every library's card, after Home.
+    data object Libraries : NavTarget
     data object Settings : NavTarget
     data object Profile : NavTarget
 
@@ -158,8 +177,11 @@ fun TopNav(
     val profileFocus = remember { FocusRequester() }
     val miniFocus = remember { FocusRequester() }
     val nowPlaying = LocalNowPlaying.current
-    val middle = LocalNavTargets.current ?: (
-        listOf(NavTarget.Home) + kinds.map(NavTarget::Library) + NavTarget.Favorites
+    // Nixie: the starred libraries in place of the Movies and Shows entries (NixieTopBar).
+    val middle = nixieTopBar(LocalNavTargets.current) ?: (
+        // Nixie (tv-home-two-rows): Libraries after Home, Collections after the libraries.
+        listOf(NavTarget.Home, NavTarget.Libraries) + kinds.map(NavTarget::Library) + NavTarget.Collections +
+            NavTarget.Favorites
         )
     // The page's own entry may be switched off: entering from below lands on search then.
     val focusTarget = active.takeIf { it in middle || it == NavTarget.Settings } ?: NavTarget.Search
@@ -181,7 +203,8 @@ fun TopNav(
         target = target,
         active = target == active,
         userName = userName,
-        onClick = { onSelect(target) },
+        // Nixie: a starred library's entry on its own page does nothing, as Glacier's current tab (NixieTopBar).
+        onClick = { if (!isOwnStarredPage(target, active)) onSelect(target) },
         down = down,
         // Right from the avatar goes to the mini player, or nowhere: not down to the page (the A–Z rail).
         end = if (target == NavTarget.Profile) (if (nowPlaying != null) miniFocus else FocusRequester.Cancel) else null,
@@ -204,19 +227,25 @@ fun TopNav(
                     // Entering from below lands on the active entry, not the geometrically nearest one.
                     .focusProperties { onEnter = { activeFocus.requestFocus() } }
                     .focusGroup()
-                    .dropShadow(
-                        PillShape,
-                        Shadow(
-                            radius = 40.dp,
-                            spread = (-14).dp,
-                            color = Color.Black.copy(alpha = 0.55f),
-                            offset = DpOffset(0.dp, 18.dp),
-                        ),
+                    // Nixie: a theme's own bar (Drive-in: a marquee) in place of Glacier's floating pill.
+                    .then(
+                        NixieTheme.slots.topBarChrome?.let { Modifier.it() } ?: Modifier
+                            .nixieShadow {
+                                dropShadow(
+                                    PillShape,
+                                    Shadow(
+                                        radius = 40.dp,
+                                        spread = (-14).dp,
+                                        color = Color.Black.copy(alpha = 0.55f),
+                                        offset = DpOffset(0.dp, 18.dp),
+                                    ),
+                                )
+                            }
+                            .clip(PillShape)
+                            .background(GlacierColors.Deep.copy(alpha = 0.72f))
+                            .background(GlacierColors.GlassFill2)
+                            .border(1.dp, GlacierColors.GlassBorder2, PillShape),
                     )
-                    .clip(PillShape)
-                    .background(GlacierColors.Deep.copy(alpha = 0.72f))
-                    .background(GlacierColors.GlassFill2)
-                    .border(1.dp, GlacierColors.GlassBorder2, PillShape)
                     // The middle adds the rest vertically, so its fade leaves room for the focus scale.
                     .padding(horizontal = 7.dp, vertical = (7 - NAV_SCROLL_INSET).dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -391,14 +420,28 @@ private fun NavItem(
         active -> accent.main.copy(alpha = 0.45f)
         else -> Color.Transparent
     }
+    // Nixie: a theme's own entry colours, and an underline for the page you are on instead of a tinted pill.
+    val look = NixieTheme.slots.topBarEntry?.invoke(focused, active)
+        ?: NavEntryLook(background, foreground, border)
     Box(
         modifier = modifier
             .focusScale(focused)
             .height(54.dp)
             .defaultMinSize(minWidth = 54.dp)
             .clip(PillShape)
-            .background(background)
-            .border(2.dp, border, PillShape)
+            .background(look.background)
+            .border(2.dp, look.border, PillShape)
+            .drawBehind {
+                if (look.underline.isSpecified) {
+                    val h = 3.dp.toPx()
+                    val inset = 14.dp.toPx()
+                    drawRect(
+                        look.underline,
+                        Offset(inset, size.height - h - 5.dp.toPx()),
+                        Size(size.width - 2 * inset, h),
+                    )
+                }
+            }
             .focusProperties {
                 if (down != null) this.down = down
                 if (end != null) this.end = end
@@ -411,7 +454,7 @@ private fun NavItem(
             NavTarget.Search -> Icon(
                 GlacierIcons.Search,
                 stringResource(R.string.nav_search),
-                tint = foreground,
+                tint = look.foreground,
                 modifier = Modifier.size(22.dp),
             )
 
@@ -419,7 +462,7 @@ private fun NavItem(
                 Icon(
                     GlacierIcons.Settings,
                     stringResource(R.string.nav_settings),
-                    tint = foreground,
+                    tint = look.foreground,
                     modifier = Modifier.size(22.dp),
                 )
                 if (LocalUpdatePending.current) {
@@ -463,13 +506,19 @@ private fun NavItem(
                 }
             }
 
-            NavTarget.Home -> NavLabel(stringResource(R.string.nav_home), foreground)
+            NavTarget.Home -> NavLabel(stringResource(R.string.nav_home), look.foreground)
 
-            NavTarget.Favorites -> NavLabel(stringResource(R.string.nav_favorites), foreground)
+            NavTarget.Favorites -> NavLabel(stringResource(R.string.nav_favorites), look.foreground)
 
-            NavTarget.LiveTv -> NavLabel(stringResource(R.string.nav_live_tv), foreground)
+            NavTarget.LiveTv -> NavLabel(stringResource(R.string.nav_live_tv), look.foreground)
 
-            is NavTarget.Library -> NavLabel(stringResource(target.kind.navTitle), foreground)
+            // Nixie (tv-home-two-rows)
+            NavTarget.Collections -> NavLabel(stringResource(R.string.scope_collections), look.foreground)
+
+            NavTarget.Libraries -> NavLabel(stringResource(R.string.nixie_nav_libraries), look.foreground)
+
+            // Nixie: a starred library goes by its name.
+            is NavTarget.Library -> NavLabel(target.name ?: stringResource(target.kind.navTitle), look.foreground)
 
             NavTarget.NowPlaying -> Unit
         }
@@ -486,14 +535,19 @@ private fun NavLabel(text: String, color: Color) {
 /** Music videos are a tab of music; they have their own entry only on a server without music. */
 fun navEntryIds(kinds: List<LibraryKind>, liveTv: Boolean): List<String> = listOf(
     NAV_HOME,
+    NAV_LIBRARIES, // Nixie (tv-home-two-rows): after Home
 ) + kinds.filterNot { it == LibraryKind.MusicVideos && LibraryKind.Music in kinds }.map { it.name } + listOfNotNull(
+    NAV_COLLECTIONS, // Nixie (tv-home-two-rows): after the libraries
     NAV_LIVE_TV.takeIf { liveTv },
 ) + NAV_FAVORITES
 
+// Nixie (tv-home-two-rows): NAV_COLLECTIONS and NAV_LIBRARIES, the Collections and Libraries entries.
 fun navTargetOf(id: String): NavTarget? = when (id) {
     NAV_HOME -> NavTarget.Home
     NAV_FAVORITES -> NavTarget.Favorites
     NAV_LIVE_TV -> NavTarget.LiveTv
+    NAV_COLLECTIONS -> NavTarget.Collections
+    NAV_LIBRARIES -> NavTarget.Libraries
     else -> LibraryKind.entries.firstOrNull { it.name == id }?.let(NavTarget::Library)
 }
 
@@ -508,3 +562,7 @@ fun navTargets(
 const val NAV_HOME = "Home"
 const val NAV_FAVORITES = "Favorites"
 const val NAV_LIVE_TV = "LiveTv"
+
+// Nixie (tv-home-two-rows): never a library kind's name.
+const val NAV_COLLECTIONS = "Collections"
+const val NAV_LIBRARIES = "Libraries"

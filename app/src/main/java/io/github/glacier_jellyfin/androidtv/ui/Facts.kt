@@ -22,6 +22,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierIcons
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierShapes
 import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
 /**
  * The facts line of spotlight and detail pages: rating, age rating, the
@@ -35,6 +36,10 @@ fun FactsRow(
     size: Int = 20,
 ) {
     val accent = LocalAccent.current.main
+    // Nixie: a theme's facts line (NixieSlots.item.facts).
+    NixieTheme.slots.item.facts?.let { slot ->
+        return slot(item.communityRating?.let { ratingText(it) }, ageRatingText(item.officialRating), facts, tech)
+    }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         item.communityRating?.let {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

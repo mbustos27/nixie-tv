@@ -1,0 +1,24 @@
+{
+  "_about": "Server profiles for the TV app's tests, laid over the Windows app's fake Jellyfin server (tvserver.py). version: what /System/Info answers. auth: the desktop server's token rules, strict (Jellyfin 12: only 'Authorization: MediaBrowser Token=...' and ApiKey) or legacy (10.x: X-Emby-*, api_key too). getInitiate: whether GET /QuickConnect/Initiate still works (12 removed it). oneTokenPerDeviceId: a sign-in revokes the earlier token of the same DeviceId, as the SDK maintainer describes the server.",
+  "jellyfin-12": {
+    "version": "12.4.0",
+    "auth": "strict",
+    "getInitiate": false,
+    "oneTokenPerDeviceId": true,
+    "use": "The default. What the official TV client calls 'works best'."
+  },
+  "jellyfin-10.11": {
+    "version": "10.11.11",
+    "auth": "legacy",
+    "getInitiate": true,
+    "oneTokenPerDeviceId": true,
+    "use": "The oldest line SDK 1.8.12 serves; every feature still has to work."
+  },
+  "jellyfin-10.10": {
+    "version": "10.10.7",
+    "auth": "legacy",
+    "getInitiate": true,
+    "oneTokenPerDeviceId": true,
+    "use": "Below the 10.11 minimum: the app must refuse it in plain words, never sign in."
+  }
+}

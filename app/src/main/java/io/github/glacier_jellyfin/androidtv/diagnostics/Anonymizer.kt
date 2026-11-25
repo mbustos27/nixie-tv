@@ -1,57 +1,48 @@
 package io.github.glacier_jellyfin.androidtv.diagnostics
 
 import io.github.glacier_jellyfin.androidtv.core.data.AccountState
+import io.github.mbustos27.nixie.tv.diagnostics.NamesScrub
+import io.github.mbustos27.nixie.tv.diagnostics.NetworkScrub
 
 /**
  * Replaces what identifies the user in a log before it leaves the device:
  * server hosts become `server-1`, `server-2` (scheme and port stay, they
  * matter for connection problems), server and user names `server-1-name`,
  * `user-1`. Item and user ids stay: they only mean something on the server.
+ * Nixie (tv-1.0-fixes): then every other address and host name ([NetworkScrub]).
+ * Nixie (tv-1.0-privacy): the names in one combined pattern per kind of place ([NamesScrub]).
  */
 class Anonymizer(servers: List<Pair<String, String>>, users: List<String>) {
 
-    /** Longest text first, so the user "demo" does not break the host "demo.jellyfin.org". */
-    private val replacements: List<Replacement> = buildList {
-        servers.forEachIndexed { index, (address, name) ->
-            val label = "server-${index + 1}"
-            hostOf(address)?.let { add(Replacement(it, Regex(Regex.escape(it), RegexOption.IGNORE_CASE), label)) }
-            if (name.usable()) add(Replacement(name, word(name), "$label-name"))
-        }
-        users.distinctBy { it.lowercase() }.filter { it.usable() }.forEachIndexed { index, name ->
-            add(Replacement(name, word(name), "user-${index + 1}"))
-        }
-    }.sortedByDescending { it.text.length }
+    // Nixie (tv-1.0-privacy): hosts before names, so the user "demo" does not break the host "demo.jellyfin.org".
+    private val names = NamesScrub(servers.map { (address, name) -> hostOf(address) to name }, users)
 
-    fun apply(text: String): String = replacements.fold(text) { result, it -> it.pattern.replace(result, it.label) }
+    // Nixie (tv-1.0-fixes): one per log, so each address keeps its number throughout.
+    private val network = NetworkScrub()
 
-    private class Replacement(
-        val text: String,
-        val pattern: Regex,
-        val label: String,
-    )
+    fun apply(text: String): String = network.apply(names.apply(text))
 
     companion object {
-        fun of(state: AccountState) = Anonymizer(
-            servers = state.servers.map { it.address to it.name },
-            users = state.users.map { it.name },
-        )
-
-        /** "https://jf.example.org:8920/jellyfin" -> "jf.example.org". */
-        internal fun hostOf(address: String): String? =
-            address.substringAfter("://").substringBefore('/').substringBefore(':').takeIf { it.isNotBlank() }
-
-        /** Whole words only, so "Jens" leaves "Jensen" alone. */
-        private fun word(name: String) = Regex(
-            "(?<![\\p{L}\\p{N}])${Regex.escape(name)}(?![\\p{L}\\p{N}])",
-            RegexOption.IGNORE_CASE,
-        )
-
         /**
-         * Names this short, or Jellyfin's default server name, would replace
-         * ordinary words of the log.
+         * The profiles and servers on the TV first (their numbers stay as they were), then, Nixie (tv-1.0-privacy),
+         * those removed before ([AccountState.nixieSeen]): older lines of the log still name them.
          */
-        private fun String.usable() = length >= MIN_NAME_LENGTH && !equals("jellyfin", ignoreCase = true)
+        fun of(state: AccountState) = Anonymizer(
+            servers = state.servers.map { it.address to it.name } +
+                state.nixieSeen.servers.map { it.address to it.name },
+            users = state.users.map { it.name } + state.nixieSeen.users,
+        )
 
-        private const val MIN_NAME_LENGTH = 3
+        /** "https://jf.example.org:8920/jellyfin" -> "jf.example.org"; "http://[2001:db8::7]:8096" -> "2001:db8::7". */
+        internal fun hostOf(address: String): String? {
+            val authority = address.substringAfter("://").substringBefore('/').substringAfterLast('@')
+            // Nixie (tv-1.0-fixes): an IPv6 host is written in brackets, its colons are not the port's.
+            val host = if (authority.startsWith("[")) {
+                authority.substringAfter('[').substringBefore(']')
+            } else {
+                authority.substringBefore(':')
+            }
+            return host.takeIf { it.isNotBlank() }
+        }
     }
 }

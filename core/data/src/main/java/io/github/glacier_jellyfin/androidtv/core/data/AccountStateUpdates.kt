@@ -60,6 +60,8 @@ internal fun AccountState.withSignIn(user: SignedInUser, now: Long): AccountStat
         primaryImageTag = user.primaryImageTag,
         accessToken = user.accessToken,
         lastUsedAt = now,
+        // Nixie: the new token's device id replaces the old one.
+        deviceId = user.deviceId ?: existing.deviceId,
     ) ?: StoredUser(
         serverId = user.serverId,
         userId = user.userId.toString(),
@@ -67,6 +69,8 @@ internal fun AccountState.withSignIn(user: SignedInUser, now: Long): AccountStat
         primaryImageTag = user.primaryImageTag,
         accessToken = user.accessToken,
         lastUsedAt = now,
+        // Nixie: the device id the token belongs to.
+        deviceId = user.deviceId,
     )
     return copy(users = users.filterNot { (it.serverId to it.userId) == key } + stored, lastServerId = user.serverId)
 }

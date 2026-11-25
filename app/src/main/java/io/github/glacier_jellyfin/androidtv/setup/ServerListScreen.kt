@@ -47,6 +47,10 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.PillButton
 import io.github.glacier_jellyfin.androidtv.core.designsystem.blockKeysWhile
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.start.NixieRemoveServerQuestion
+import io.github.mbustos27.nixie.tv.start.NixieServerCardFocus
+import io.github.mbustos27.nixie.tv.start.NixieServerMenu
+import io.github.mbustos27.nixie.tv.start.NixieServerMenuFocus
 
 @Composable
 fun ServerListScreen(
@@ -58,6 +62,9 @@ fun ServerListScreen(
     CollectEvents(viewModel.events, onNavigate)
 
     val firstFocus = remember { FocusRequester() }
+    // Nixie (tv-gate-a): the card a closed menu goes back to; after a removal the list's first entry takes the focus.
+    val cardFocus = remember { NixieServerCardFocus() }
+    NixieServerMenuFocus(state.menuFor ?: state.removeAsked, cardFocus, state.refocus, state.removed, firstFocus)
     // Focus the first saved server, or the manual entry, right away. Servers
     // found later never take focus away from where the user already is.
     LaunchedEffect(state.savedLoaded) {
@@ -107,7 +114,11 @@ fun ServerListScreen(
                     ServerCard(
                         entry,
                         onClick = { viewModel.select(entry) },
-                        modifier = nextFocus(),
+                        // Nixie (tv-gate-a): a saved server's menu, on the Menu key or a long OK (never its profiles).
+                        onMenu = { viewModel.openMenu(entry) },
+                        modifier = nextFocus()
+                            .focusRequester(cardFocus.of(entry.server.id))
+                            .then(cardFocus.track(entry.server.id)),
                     )
                 }
             }
@@ -127,7 +138,7 @@ fun ServerListScreen(
                 ServerCard(
                     entry,
                     onClick = { viewModel.select(entry) },
-                    modifier = nextFocus(),
+                    modifier = nextFocus().then(cardFocus.track("found:" + entry.server.id)),
                 )
             }
             if (!state.searching && state.discovered.isEmpty()) {
@@ -143,7 +154,7 @@ fun ServerListScreen(
                 icon = GlacierIcons.Plus,
                 height = 72,
                 fillWidth = true,
-                modifier = Modifier.padding(top = 6.dp).then(nextFocus()),
+                modifier = Modifier.padding(top = 6.dp).then(nextFocus()).then(cardFocus.track("manual")),
             )
         }
     }
@@ -151,8 +162,23 @@ fun ServerListScreen(
     // Back while connecting stops it and stays here; the server is not opened afterwards.
     BackHandler(enabled = state.connecting != null) { viewModel.cancelConnect() }
     state.connecting?.let { BusyOverlay(stringResource(R.string.setup_connecting, it)) }
+    // Nixie (tv-fix-a): "Removing …" at once; the TV's part takes a moment, and Back waits for it, so it never leads to
+    // the server's own pages before they leave the back stack.
+    BackHandler(enabled = state.removing != null) { }
+    state.removing?.let { BusyOverlay(stringResource(R.string.nixie_server_removing, it.server.name)) }
 
     state.confirmUnsupported?.let { server -> UnsupportedServerDialog(server, viewModel::confirmUnsupported) }
+    // Nixie (tv-gate-a): the saved server's menu and Remove's question.
+    state.menuFor?.let { entry ->
+        NixieServerMenu(
+            entry,
+            onRemove = viewModel::askRemove,
+            onDismiss = viewModel::closeMenu,
+        )
+    }
+    state.removeAsked?.let { entry ->
+        NixieRemoveServerQuestion(entry, onRemove = viewModel::remove, onCancel = viewModel::dismissRemove)
+    }
 }
 
 @Composable
@@ -168,6 +194,7 @@ private fun ServerCard(
     entry: ServerEntry,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onMenu: (() -> Unit)? = null,
 ) {
     val accent = LocalAccent.current.main
     val shape = RoundedCornerShape(GlacierShapes.RadiusMd)
@@ -177,6 +204,7 @@ private fun ServerCard(
         shape = shape,
         modifier = modifier.fillMaxWidth(),
         unfocusedBorder = GlacierColors.GlassBorder,
+        onLongClick = onMenu,
     ) { focused ->
         Row(
             modifier = Modifier

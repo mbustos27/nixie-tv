@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_watchnext_setting">Mostrar Seguir viendo en la pantalla de inicio</string>
+    <string name="nixie_watchnext_setting_sub">Algunas pantallas de inicio no lo muestran, entre ellas la de Google TV</string>
+</resources>

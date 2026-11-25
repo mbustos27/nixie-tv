@@ -26,7 +26,7 @@ class ReleaseFeed(private val url: String) {
             connection.readTimeout = TIMEOUT_MS
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            connection.setRequestProperty("User-Agent", "Glacier")
+            connection.setRequestProperty("User-Agent", "Nixie") // Nixie: the app's name
             if (connection is HttpURLConnection && connection.responseCode != HttpURLConnection.HTTP_OK) {
                 throw IOException("Release feed answered ${connection.responseCode}")
             }

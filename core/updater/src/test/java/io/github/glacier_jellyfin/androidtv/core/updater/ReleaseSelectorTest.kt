@@ -10,10 +10,12 @@ class ReleaseSelectorTest {
         tag: String,
         prerelease: Boolean = tag.contains("-beta"),
         draft: Boolean = false,
-        apkNames: List<String> = listOf(ReleaseSelector.APK_NAME),
+        apkNames: List<String>? = null,
     ): Release {
         val version = tag.removePrefix("v")
-        val assets = apkNames.map { ReleaseAsset(it, "https://example.invalid/$version/$it", 1, null) }
+        // Nixie: a release carries Nixie-TV-<version>.apk unless the test names its assets.
+        val names = apkNames ?: listOf("Nixie-TV-$version.apk")
+        val assets = names.map { ReleaseAsset(it, "https://example.invalid/$version/$it", 1, null) }
         return Release(tag, isDraft = draft, isPrerelease = prerelease, assets = assets)
     }
 
@@ -57,27 +59,29 @@ class ReleaseSelectorTest {
         assertNull(ReleaseSelector.select(broken, v("1.0.0"), UpdateChannel.Beta))
     }
 
+    // Nixie: Glacier's two names replaced by Nixie's own; Glacier's are never offered.
     @Test
-    fun `accepts the versioned apk name of older releases`() {
-        val legacy = listOf(release("v1.5.0", apkNames = listOf("glacier-androidtv-1.5.0.apk")))
+    fun `picks Nixie's versioned apk next to its checksum`() {
+        val release = listOf(release("v1.5.0", apkNames = listOf("Nixie-TV-1.5.0.apk.sha256", "Nixie-TV-1.5.0.apk")))
         assertEquals(
-            "glacier-androidtv-1.5.0.apk",
-            ReleaseSelector.select(legacy, v("1.3.0"), UpdateChannel.Stable)?.apk?.name,
+            "Nixie-TV-1.5.0.apk",
+            ReleaseSelector.select(release, v("1.3.0"), UpdateChannel.Stable)?.apk?.name,
         )
+        assertEquals("Nixie-TV-1.4.0-beta.2.apk", ReleaseSelector.nixieApkName(v("1.4.0-beta.2")))
     }
 
     @Test
-    fun `prefers the fixed apk name when a release has both`() {
-        val both = listOf(release("v1.5.0", apkNames = listOf("glacier-androidtv-1.5.0.apk", ReleaseSelector.APK_NAME)))
-        assertEquals(
-            ReleaseSelector.APK_NAME,
-            ReleaseSelector.select(both, v("1.3.0"), UpdateChannel.Stable)?.apk?.name,
+    fun `never offers Glacier's apk names`() {
+        val glacier = listOf(
+            release("v1.5.0", apkNames = listOf(ReleaseSelector.APK_NAME)),
+            release("v1.4.0", apkNames = listOf(ReleaseSelector.legacyApkName(v("1.4.0")))),
         )
+        assertNull(ReleaseSelector.select(glacier, v("1.3.0"), UpdateChannel.Stable))
     }
 
     @Test
     fun `ignores apks of other versions`() {
-        val wrong = listOf(release("v1.5.0", apkNames = listOf("glacier-androidtv-1.4.0.apk")))
+        val wrong = listOf(release("v1.5.0", apkNames = listOf("Nixie-TV-1.4.0.apk")))
         assertNull(ReleaseSelector.select(wrong, v("1.3.0"), UpdateChannel.Stable))
     }
 

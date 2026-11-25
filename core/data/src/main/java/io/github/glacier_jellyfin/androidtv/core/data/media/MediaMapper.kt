@@ -1,5 +1,6 @@
 package io.github.glacier_jellyfin.androidtv.core.data.media
 
+import io.github.mbustos27.nixie.tv.data.tidyCollection
 import java.util.UUID
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.imageApi
@@ -92,7 +93,8 @@ internal class MediaMapper(private val api: ApiClient) {
         return MediaItem(
             id = dto.id,
             kind = kind,
-            title = dto.name.orEmpty(),
+            // Nixie: a box set's name tidied ("[HUB] Marvel" reads "Marvel"); other titles as they are.
+            title = if (kind == ItemKind.Collection) tidyCollection(dto) else dto.name.orEmpty(),
             sortName = dto.sortName,
             year = dto.productionYear,
             endYear = dto.endDate?.year?.takeIf { kind == ItemKind.Series },
@@ -113,6 +115,7 @@ internal class MediaMapper(private val api: ApiClient) {
             artistId = dto.albumArtists?.firstOrNull()?.id?.takeIf { kind == ItemKind.Album },
             seasonNumber = dto.parentIndexNumber,
             episodeNumber = dto.indexNumber,
+            episodeNumberEnd = dto.indexNumberEnd?.takeIf { kind == ItemKind.Episode }, // Nixie: multi-episode files
             progress = dto.userData?.playedPercentage?.let { (it / 100).toFloat() }?.takeIf { it > 0f },
             remainingMinutes = remaining,
             resumePositionMs = position / TICKS_PER_MS,

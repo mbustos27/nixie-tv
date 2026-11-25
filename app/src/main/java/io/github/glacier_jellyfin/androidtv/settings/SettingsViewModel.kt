@@ -3,6 +3,7 @@ package io.github.glacier_jellyfin.androidtv.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.glacier_jellyfin.androidtv.BuildConfig
 import io.github.glacier_jellyfin.androidtv.R
 import io.github.glacier_jellyfin.androidtv.core.data.AccountRepository
 import io.github.glacier_jellyfin.androidtv.core.data.AgeLimit
@@ -52,6 +53,9 @@ import io.github.glacier_jellyfin.androidtv.parental.PinReason
 import io.github.glacier_jellyfin.androidtv.player.choosesDolbyVisionProfile7
 import io.github.glacier_jellyfin.androidtv.player.playbackSetup
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.data.NixieHomeSettings
+import io.github.mbustos27.nixie.tv.diagnostics.NixieReport
+import io.github.mbustos27.nixie.tv.diagnostics.NixieReportProblem
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -136,6 +140,8 @@ data class DiagnosticsState(
     val verboseUntil: Long? = null,
     /** The log on the local network while its page is open. */
     val share: LogShare? = null,
+    /** Nixie (tv-1.0-r1): Report a problem's page while it is open (NixieReportProblem). */
+    val report: NixieReport? = null,
 )
 
 /** Settings › System › Server; [version] is asked fresh from the server, the stored one until then. */
@@ -159,12 +165,40 @@ class SettingsViewModel @Inject constructor(
     private val sync: SettingsSync,
     val updates: UpdateManager,
     val whatsNew: WhatsNew,
+    // Nixie (play stream): forgetting learned skips.
+    private val skips: io.github.mbustos27.nixie.tv.data.skips.SkipChain,
 ) : ViewModel() {
+
+    // Nixie (play stream): the play stream's own settings key, and "Forget learned skips".
+    fun updateNixiePlay(
+        transform: (
+            io.github.mbustos27.nixie.tv.data.play.NixiePlaySettings,
+        ) -> io.github.mbustos27.nixie.tv.data.play.NixiePlaySettings,
+    ) {
+        viewModelScope.launch { settings.update { it.copy(nixiePlay = transform(it.nixiePlay)) } }
+    }
+
+    fun forgetLearnedSkips() {
+        skips.forgetLearned()
+        viewModelScope.launch { _events.send(UiEvent.Toast(R.string.nixie_learned_forgotten)) }
+    }
+    // Nixie (play stream) end.
+
+    // Nixie (tv-watchnext): Continue watching on the TV's home screen, its own settings key.
+    fun updateNixieWatchNext(
+        transform: (
+            io.github.mbustos27.nixie.tv.data.watchnext.NixieWatchNextSettings,
+        ) -> io.github.mbustos27.nixie.tv.data.watchnext.NixieWatchNextSettings,
+    ) {
+        viewModelScope.launch { settings.update { it.copy(nixieWatchNext = transform(it.nixieWatchNext)) } }
+    }
+    // Nixie (tv-watchnext) end.
 
     private val _state = MutableStateFlow(
         SettingsUiState(
             userName = sessions.session.value?.user?.name.orEmpty(),
-            thisDeviceId = sessions.session.value?.api?.deviceInfo?.id,
+            // Nixie: settings copies are keyed by the install's id (SettingsSync).
+            thisDeviceId = sessions.session.value?.installDeviceId,
         ),
     )
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -268,6 +302,11 @@ class SettingsViewModel @Inject constructor(
 
     fun updateFolders(transform: (FolderSettings) -> FolderSettings) {
         viewModelScope.launch { settings.update { it.copy(folders = transform(it.folders)) } }
+    }
+
+    // Nixie: the home stream's settings (NixieHomeSettings).
+    fun updateNixieHome(transform: (NixieHomeSettings) -> NixieHomeSettings) {
+        viewModelScope.launch { settings.update { it.copy(nixieHome = transform(it.nixieHome)) } }
     }
 
     fun updateSubtitleStyle(transform: (SubtitleStyle) -> SubtitleStyle) {
@@ -473,6 +512,8 @@ class SettingsViewModel @Inject constructor(
     fun clearLog() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { Log.clear() }
+            // Nixie (tv-1.0-privacy): the removed servers' and profiles' names were kept only for the old lines.
+            accounts.nixieForgetNamesSeen()
             _state.update { it.copy(diagnostics = DiagnosticsState(verboseUntil = Log.verboseUntil())) }
             _events.send(UiEvent.Toast(R.string.diag_cleared))
         }
@@ -518,6 +559,15 @@ class SettingsViewModel @Inject constructor(
         logServer = null
         _state.update { it.copy(diagnostics = it.diagnostics.copy(share = null)) }
     }
+
+    // Nixie (tv-1.0-r1): Report a problem's code, with this build's version and the server's as Settings › System shows
+    // it (no request: the saved one until the fresh one came). Nothing is sent.
+    fun showReport() = _state.update {
+        val report = NixieReportProblem.report(BuildConfig.VERSION_NAME, it.serverSummary?.version)
+        it.copy(diagnostics = it.diagnostics.copy(report = report))
+    }
+
+    fun closeReport() = _state.update { it.copy(diagnostics = it.diagnostics.copy(report = null)) }
 
     override fun onCleared() {
         logServer?.close()

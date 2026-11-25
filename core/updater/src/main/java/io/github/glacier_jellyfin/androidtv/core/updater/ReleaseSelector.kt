@@ -78,7 +78,11 @@ object ReleaseSelector {
         return UpdateCandidate(version, release, apkOf(release, version)!!, skipped)
     }
 
+    // Nixie: Nixie for TV's APK is named after the app and its version, the name tools/release-check checks (a
+    // `Nixie-TV-<version>.apk.sha256` sits beside it). Glacier's names above are never picked, so a release of
+    // Glacier's can never be offered.
+    fun nixieApkName(version: AppVersion): String = "Nixie-TV-$version.apk"
+
     private fun apkOf(release: Release, version: AppVersion): ReleaseAsset? =
-        release.assets.firstOrNull { it.name == APK_NAME }
-            ?: release.assets.firstOrNull { it.name == legacyApkName(version) }
+        release.assets.firstOrNull { it.name == nixieApkName(version) }
 }

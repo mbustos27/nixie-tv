@@ -110,6 +110,16 @@ import io.github.glacier_jellyfin.androidtv.ui.qualityText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.seasonLabel
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.nixiePlayArea
+import io.github.mbustos27.nixie.tv.detail.CardReturn
+import io.github.mbustos27.nixie.tv.detail.cardReturn
+import io.github.mbustos27.nixie.tv.detail.cardReturnPage
+import io.github.mbustos27.nixie.tv.detail.rememberCardReturn
+import io.github.mbustos27.nixie.tv.play.playLabelText
+import io.github.mbustos27.nixie.tv.trailer.NixieTrailerWarmup
+import io.github.mbustos27.nixie.tv.trailer.nixieWarmTrailerOnFocus
+import io.github.mbustos27.nixie.tv.trailer.rememberReturnFocus
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -225,8 +235,12 @@ private fun MediaDetail(
     val listState = rememberLazyListState()
     val playFocus = remember { FocusRequester() }
     var initialFocusDone by rememberSaveable(item.id) { mutableStateOf(false) }
+    val trailerReturn = rememberReturnFocus() // Nixie (TV-S3)
+    val cardReturn = rememberCardReturn() // Nixie (tv-gate-b): Back focuses the episode or cast card opened
+    NixieTrailerWarmup(details) // Nixie (TV-S9): the YouTube trailer's player made ahead once the page is drawn
 
-    Box(Modifier.fillMaxSize().background(ImagePageGround)) {
+    // Nixie (tv-fix-b): a key pressed on the page drops a return still waiting for its card.
+    Box(Modifier.fillMaxSize().background(ImagePageGround).cardReturnPage(cardReturn)) {
         ScrollingBackdrop(item.backdropUrl, MEDIA_BACKDROP, listState)
         CompositionLocalProvider(LocalBringIntoViewSpec provides rememberRowPivotSpec(listState, HEADER_REGION)) {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -251,7 +265,8 @@ private fun MediaDetail(
                         FactsRow(item, mediaFacts(details), tech = techLine(details))
                         item.overview?.let { Overview(it, maxWidth = 900) }
                         Row(
-                            Modifier.padding(top = 10.dp).upTo(LocalMiniPlayerFocus.current),
+                            // Nixie: a theme's frame for the Play area (NixieSlots.item.playArea).
+                            Modifier.padding(top = 10.dp).upTo(LocalMiniPlayerFocus.current).nixiePlayArea(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
@@ -267,8 +282,15 @@ private fun MediaDetail(
                             SeenButton(item.played, onClick = viewModel::togglePlayed)
                             if (details.trailers.any) {
                                 ActionButton(
-                                    onClick = viewModel::playTrailer,
+                                    // Nixie (TV-S3): Back from the trailer lands on this button again.
+                                    onClick = {
+                                        trailerReturn.opened()
+                                        viewModel.playTrailer()
+                                    },
                                     label = stringResource(R.string.detail_trailer),
+                                    // Nixie (TV-S9): the focus makes the trailer's player ahead again, if it was let go.
+                                    modifier = Modifier.focusRequester(trailerReturn.requester)
+                                        .nixieWarmTrailerOnFocus(details),
                                 )
                             }
                             if (item.kind == ItemKind.Movie || item.kind == ItemKind.MusicVideo) {
@@ -294,6 +316,7 @@ private fun MediaDetail(
                             currentId = null,
                             onClick = viewModel::openEpisode,
                             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+                            returnTo = cardReturn, // Nixie (tv-gate-b)
                         )
                     }
                 }
@@ -307,7 +330,16 @@ private fun MediaDetail(
                             items(
                                 details.cast,
                                 key = { it.id },
-                            ) { person -> CastCard(person, onClick = { viewModel.openPerson(person) }) }
+                            ) { person ->
+                                CastCard(
+                                    person.name,
+                                    person.role,
+                                    person.imageUrl,
+                                    onClick = { viewModel.openPerson(person) },
+                                    // Nixie (tv-gate-b): Back from the person focuses this card again.
+                                    modifier = Modifier.cardReturn(cardReturn, person.id.toString()),
+                                )
+                            }
                         }
                     }
                 }
@@ -400,7 +432,8 @@ private fun EpisodeDetail(
                                 )
                             }
                             Row(
-                                Modifier.padding(top = 6.dp).upTo(LocalMiniPlayerFocus.current),
+                                // Nixie: a theme's frame for the Play area (NixieSlots.item.playArea).
+                                Modifier.padding(top = 6.dp).upTo(LocalMiniPlayerFocus.current).nixiePlayArea(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
@@ -471,6 +504,8 @@ internal fun ScrollingBackdrop(
 /** One line; too long, it gives up [overflow]'s end (a folder path keeps its nearest part with a start ellipsis). */
 @Composable
 internal fun Crumb(text: String, overflow: TextOverflow = TextOverflow.Ellipsis) {
+    // Nixie: a theme's crumb line (NixieSlots.item.crumb).
+    NixieTheme.slots.item.crumb?.let { return it(text.uppercase()) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(
             GlacierIcons.ChevronLeft,
@@ -494,6 +529,8 @@ internal fun Title(
     size: Int,
     maxWidth: Int,
 ) {
+    // Nixie: a theme's title (NixieSlots.item.title).
+    NixieTheme.slots.item.title?.let { return it(text, size, maxWidth) }
     Text(
         text,
         style = GlacierText.display(size)
@@ -531,7 +568,8 @@ private fun PlayButtons(
     val left = target?.remainingMinutes?.takeIf { target.progress != null }
     ActionButton(
         onClick = { viewModel.play() },
-        label = when {
+        // Nixie: "Resume S1 E4", "Play S2 E1" for an episode or a show's next one; Glacier's label for a film.
+        label = playLabelText(target) ?: when {
             // The episode page already shows "x % watched · y min left" above the buttons.
             left != null && episodeLabel -> stringResource(R.string.hero_resume)
 
@@ -546,7 +584,11 @@ private fun PlayButtons(
         modifier = Modifier.focusRequester(focus),
     )
     if (left != null && item.kind != ItemKind.Series) {
-        ActionButton(onClick = { viewModel.play(fromStart = true) }, label = stringResource(R.string.detail_from_start))
+        // Nixie: "Play from the start".
+        ActionButton(
+            onClick = { viewModel.play(fromStart = true) },
+            label = stringResource(R.string.nixie_play_from_start),
+        )
     }
 }
 
@@ -863,17 +905,28 @@ private fun SeasonSheet(
 
 /** Episodes of a season; entering the row lands on [focusIndex] (the first unwatched one). */
 @Composable
-private fun EpisodeRow(
+internal fun EpisodeRow( // Nixie (tv-gate-b): internal for CardReturnTest
     episodes: List<MediaItem>,
     focusIndex: Int,
     currentId: UUID?,
     onClick: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
+    // Nixie (tv-gate-b): the page's memory of the episode opened, whose card Back focuses again.
+    returnTo: CardReturn? = null,
 ) {
     val rowState = rememberLazyListState()
     val target = remember { FocusRequester() }
     LaunchedEffect(episodes, focusIndex) {
-        if (episodes.isNotEmpty()) rowState.scrollToItem(focusIndex.coerceIn(0, episodes.lastIndex))
+        if (episodes.isEmpty()) return@LaunchedEffect
+        // Nixie (tv-gate-b): back from an episode's page, the row stays as it was left (its scroll is saved with the
+        // page), not moved to the first unwatched one; scrolled to the episode only if it is out of view.
+        val back = episodes.indexOfFirst { it.id.toString() == returnTo?.pending }
+        if (back >= 0) {
+            withFrameNanos { }
+            if (rowState.layoutInfo.visibleItemsInfo.none { it.index == back }) rowState.scrollToItem(back)
+            return@LaunchedEffect
+        }
+        rowState.scrollToItem(focusIndex.coerceIn(0, episodes.lastIndex))
     }
     MediaRow(
         title = null,
@@ -889,7 +942,8 @@ private fun EpisodeRow(
                 episode = episode,
                 onClick = { onClick(episode) },
                 current = episode.id == currentId,
-                modifier = if (index == focusIndex) Modifier.focusRequester(target) else Modifier,
+                modifier = (if (index == focusIndex) Modifier.focusRequester(target) else Modifier)
+                    .cardReturn(returnTo, episode.id.toString()), // Nixie (tv-gate-b)
             )
         }
     }

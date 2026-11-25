@@ -12,6 +12,8 @@ data class HomeLaunch(
     val serverId: String,
     val userId: String,
     val itemId: String,
+    // Nixie (tv-watchnext): an entry of the home screen's Continue watching plays from where it was left.
+    val play: Boolean = false,
 ) {
 
     /** Explicit, so test and release builds installed side by side never open each other. */
@@ -20,12 +22,14 @@ data class HomeLaunch(
         .putExtra(EXTRA_SERVER, serverId)
         .putExtra(EXTRA_USER, userId)
         .putExtra(EXTRA_ITEM, itemId)
+        .apply { if (play) putExtra(EXTRA_PLAY, true) } // Nixie (tv-watchnext)
 
     companion object {
         private const val ACTION = "io.github.glacier_jellyfin.androidtv.OPEN_TITLE"
         private const val EXTRA_SERVER = "server"
         private const val EXTRA_USER = "user"
         private const val EXTRA_ITEM = "item"
+        private const val EXTRA_PLAY = "play" // Nixie (tv-watchnext)
 
         fun from(intent: Intent?): HomeLaunch? {
             if (intent?.action != ACTION) return null
@@ -33,6 +37,7 @@ data class HomeLaunch(
                 serverId = intent.getStringExtra(EXTRA_SERVER) ?: return null,
                 userId = intent.getStringExtra(EXTRA_USER)?.let(::uuid) ?: return null,
                 itemId = intent.getStringExtra(EXTRA_ITEM)?.let(::uuid) ?: return null,
+                play = intent.getBooleanExtra(EXTRA_PLAY, false), // Nixie (tv-watchnext)
             )
         }
 

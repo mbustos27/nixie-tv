@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: A security problem
+    url: https://github.com/mbustos27/nixie-tv/security/advisories/new
+    about: Report it privately, never in a public issue. SECURITY.md explains what to include.
+  - name: Running a Jellyfin server yourself
+    url: https://jellyfin.org/docs/general/getting-help/
+    about: Libraries, users, plugins and transcoding settings belong to the server and whoever runs it. Jellyfin's own community helps with those.

@@ -157,7 +157,7 @@ class MediaCapabilityDetector @Inject constructor(
     }
 
     /** [iec61937] for the outputs it was found for, so a new route asks again. */
-    private var iec61937Cache: Pair<List<Int>, Boolean>? = null
+    private val iec61937Cache = OutputsAnswer()
 
     /**
      * Whether HDMI takes IEC 61937 bursts on 8 channels at 192 kHz, the high
@@ -169,19 +169,17 @@ class MediaCapabilityDetector @Inject constructor(
         val audioManager = context.getSystemService(AudioManager::class.java) ?: return false
         val outputs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         val hdmi = outputs.filter { it.type in HDMI_OUTPUTS }
-        val route = outputs.map { it.id }.sorted()
-        iec61937Cache?.takeIf { it.first == route }?.let { return it.second }
-        val available = hdmi.isNotEmpty() && (
-            iecTrackSupported() ||
-                hdmi.any {
-                    AudioFormat.ENCODING_IEC61937 in it.encodings &&
-                        (it.channelCounts.isEmpty() || it.channelCounts.any { n -> n >= 8 })
-                } ||
-                // Some devices say no to the 8-channel carrier and play it all the same.
-                iecTrackOpens()
-            )
-        iec61937Cache = route to available
-        return available
+        return iec61937Cache.answer(OutputState.of(outputs)) {
+            hdmi.isNotEmpty() && (
+                iecTrackSupported() ||
+                    hdmi.any {
+                        AudioFormat.ENCODING_IEC61937 in it.encodings &&
+                            (it.channelCounts.isEmpty() || it.channelCounts.any { n -> n >= 8 })
+                    } ||
+                    // Some devices say no to the 8-channel carrier and play it all the same.
+                    iecTrackOpens()
+                )
+        }
     }
 
     private fun iecFormat(): AudioFormat = AudioFormat.Builder()

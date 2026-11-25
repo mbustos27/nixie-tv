@@ -1,0 +1,22 @@
+{
+  "schema": "nixie-device-answers/1",
+  "source": "expected",
+  "verified": false,
+  "about": "What the architecture plan expects of this box, from public reports. Every null is unknown until the box's own device-facts.json (Save device facts in a debug build) replaces this file.",
+  "device": {
+    "model": "Google TV Streamer, 2024",
+    "chip": "MediaTek MT8696 (reported)",
+    "notes": "32-bit userspace reported. Decodes TrueHD to PCM instead of bitstreaming it (Plex forum). Wireless debugging reportedly blocked on Ethernet."
+  },
+  "abis": null,
+  "abis64": null,
+  "memory": {
+    "lowRamDevice": false,
+    "memoryClassMb": null,
+    "largeMemoryClassMb": null,
+    "totalMb": 4096
+  },
+  "display": null,
+  "audioDirect": null,
+  "decoders": null
+}

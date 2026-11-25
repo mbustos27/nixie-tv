@@ -1,0 +1,121 @@
+name: Report a problem
+description: Something in Nixie for TV doesn't work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Say what happened and how to make it happen again. The log from the TV (below) helps more than anything else.
+
+        **Never paste a server address, user name, password or token.** None of it is needed, and this page is public.
+
+  - type: input
+    id: version
+    attributes:
+      label: Nixie for TV version
+      description: Settings › System shows it.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: TV box or TV, and its Android version
+      description: The model's name is enough. Android's own Settings › About shows the version.
+      placeholder: Chromecast with Google TV (4K), Android 14
+    validations:
+      required: true
+
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      description: Settings › Appearance › Theme.
+      options:
+        - Drive-in
+        - Cinematic
+        - Editorial
+        - It happens in all of them
+    validations:
+      required: true
+
+  - type: input
+    id: jellyfin
+    attributes:
+      label: Jellyfin server version
+      description: |
+        The version number only, never the server's address. Settings › System shows it as Server version, and the log has it too. Leave it blank if you don't know it.
+      placeholder: "12.4.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it happens
+      multiple: true
+      options:
+        - Signing in or choosing a profile
+        - Home
+        - A library or collection
+        - A film, show, season or episode page
+        - Playing video
+        - Trailers
+        - Search
+        - Music, photos or live TV
+        - Settings
+        - Updates
+        - The TV's home screen (Continue watching there)
+        - Somewhere else
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: |
+        What you saw, and what you expected instead. A photo of the screen helps: drop it in here, with server names and addresses covered.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The shortest way there from opening Nixie, the remote's keys included, and whether it happens every time or only sometimes.
+      placeholder: |
+        1. Open a show and choose season 2.
+        2. Press OK on episode 3.
+        3. Press Back while it starts.
+    validations:
+      required: true
+
+  - type: textarea
+    id: playback
+    attributes:
+      label: What was playing (playback problems only)
+      description: |
+        If you know them: the picture (for example 4K HDR10, Dolby Vision, 1080p), the sound (for example DTS-HD MA, TrueHD, AAC) and the subtitles (for example ASS, PGS, SRT). The log usually has them.
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: The log
+      description: |
+        On the TV: **Settings › System › Diagnostics**. For a playback problem, turn on **Detailed logging** first and make the problem happen again. Then choose **Download log on the network** and scan the code with a phone on the same network; the phone saves the log as a text file. Drag that file into this box.
+
+        Server addresses and names, user names, passwords and access tokens are taken out before the log leaves the TV, but read it before you attach it. **Send log to the server** doesn't help here: it goes to the server admin's dashboard, not to this page.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you send it
+      options:
+        - label: This report has no server address, user name, password or token in it.
+          required: true

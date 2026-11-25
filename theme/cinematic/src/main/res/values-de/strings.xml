@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <!-- An episode's number on its still, as Glacier's episode badge says it. -->
+    <string name="cinematic_episode_number">F%1$d</string>
+    <!-- An episode's runtime on its still, as Glacier's runtime says it. -->
+    <string name="cinematic_runtime_minutes">%1$d Min.</string>
+</resources>

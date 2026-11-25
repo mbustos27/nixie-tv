@@ -21,10 +21,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.dp
+import io.github.mbustos27.nixie.tv.designsystem.NixieBrand
+import io.github.mbustos27.nixie.tv.designsystem.NixieMark
+import io.github.mbustos27.nixie.tv.designsystem.NixieSpinner
 
 /** The Glacier mark: an outlined diamond around a solid core (26-unit grid). */
 @Composable
 fun GlacierMark(size: Int, modifier: Modifier = Modifier) {
+    // Nixie: Nixie's own mark, a nixie tube, wherever Glacier shows its diamond.
+    if (NixieBrand.ownMark) return NixieMark(size, modifier)
     val accent = LocalAccent.current.main
     Canvas(modifier.size(size.dp)) {
         val unit = this.size.width / 26f
@@ -39,6 +44,8 @@ fun GlacierMark(size: Int, modifier: Modifier = Modifier) {
  */
 @Composable
 fun SpinningDiamond(size: Int, modifier: Modifier = Modifier) {
+    // Nixie: a counting nixie tube in place of Glacier's turning diamond.
+    if (NixieBrand.ownMark) return NixieSpinner(size, modifier)
     val accent = LocalAccent.current.main
     val transition = rememberInfiniteTransition(label = "diamond")
     val ease = CubicBezierEasing(0.7f, 0f, 0.2f, 1f)

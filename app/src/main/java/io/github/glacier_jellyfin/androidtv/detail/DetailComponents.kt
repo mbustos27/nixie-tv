@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +72,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.focusScale
 import io.github.glacier_jellyfin.androidtv.ui.Artwork
 import io.github.glacier_jellyfin.androidtv.ui.LocalCardSizes
 import io.github.glacier_jellyfin.androidtv.ui.ProgressBar
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
 /**
  * One line of [TrackPanel]: [label] with its [flag], the quieter [facts]
@@ -399,6 +401,19 @@ fun EpisodeCard(
                 .focusFrame(focused, shape, unfocusedBorder = if (current) accent.deep else Color.Transparent)
                 .clip(shape),
         ) {
+            // Nixie: a theme's episode still (NixieSlots.item.episodeStill) in place of everything on the picture.
+            NixieTheme.slots.item.episodeStill?.let { still ->
+                still(
+                    episode.thumbUrl,
+                    episode.episodeNumber,
+                    episode.runtimeMinutes?.takeIf { it > 0 },
+                    episode.progress,
+                    episode.played,
+                    current,
+                    focused,
+                ) { url, m -> Artwork(url, m) }
+                return@Box
+            }
             Artwork(episode.thumbUrl, Modifier.fillMaxSize())
             Box(
                 Modifier.fillMaxSize().background(
@@ -462,7 +477,10 @@ fun EpisodeCard(
                 color = GlacierColors.Mist,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(48.dp),
+                // Nixie: two lines at any system font scale (a fixed 48 dp held only one at large text). Android 14 scales
+                // large text less than small text and keeps the line height's ratio to the font: two lines of 16 sp at
+                // 1.5 line height are three times the font size.
+                modifier = Modifier.height(with(LocalDensity.current) { 16.sp.toDp() * 3 }),
             )
         }
     }
@@ -540,6 +558,8 @@ fun CastCard(
             color = if (focused) accent.main else GlacierColors.Ice,
             textAlign = TextAlign.Center,
             maxLines = 2,
+            // Nixie (tv-gate-b): a long name ends in "…" on its second line, not cut there with the rest missing.
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
         role?.let {
@@ -549,6 +569,7 @@ fun CastCard(
                 color = GlacierColors.Mist,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis, // Nixie (tv-gate-b): as the name
                 modifier = Modifier.fillMaxWidth(),
             )
         }

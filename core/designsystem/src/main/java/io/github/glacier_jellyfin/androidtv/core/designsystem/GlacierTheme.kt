@@ -44,10 +44,12 @@ fun GlacierTheme(
         border = GlacierColors.GlassBorder,
     )
     val windowWidth = LocalWindowInfo.current.containerSize.width
+    // Nixie: the system's large text applies (the plan: layouts reflow at system font scales), up to 1.3.
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, NIXIE_MAX_FONT_SCALE)
     val density = if (windowWidth > 0) {
         Density(
             density = windowWidth / DesignWidth,
-            fontScale = 1f,
+            fontScale = fontScale,
         )
     } else {
         LocalDensity.current
@@ -60,3 +62,6 @@ fun GlacierTheme(
         MaterialTheme(colorScheme = colors, typography = GlacierTypography, content = content)
     }
 }
+
+// Nixie: the largest system font scale the layouts are drawn for (Android's "large" text).
+private const val NIXIE_MAX_FONT_SCALE = 1.3f

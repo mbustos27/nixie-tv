@@ -105,7 +105,8 @@ fun LogShareScreen(share: LogShare, onClose: () -> Unit) {
                     Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
                         Step(1, stringResource(R.string.diag_share_step_network))
                         Step(2, stringResource(R.string.diag_share_step_scan))
-                        Step(3, stringResource(R.string.diag_share_step_attach, ISSUES_URL))
+                        // Nixie: no tracker to send the log to; the user shares it with whoever helps them.
+                        Step(3, stringResource(R.string.diag_share_step_attach))
                     }
                     Box(Modifier.fillMaxWidth().height(1.dp).background(GlacierColors.GlassBorder))
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -191,4 +192,4 @@ private fun Fact(label: String, value: String) {
     }
 }
 
-internal const val ISSUES_URL = "github.com/Glacier-Jellyfin/glacier-androidtv/issues"
+// Nixie: Glacier's ISSUES_URL removed: Nixie for TV has no public tracker, and its users' logs never go to Glacier's.

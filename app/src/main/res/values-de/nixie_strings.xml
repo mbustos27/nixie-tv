@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_settings_accent_theme">Dieses Design hat eigene Farben, die Akzentfarbe zeigt sich darin nicht.</string>
+    <string name="nixie_based_on">Basiert auf Glacier</string>
+    <string name="nixie_based_on_sub">Nixie for TV basiert auf Glacier von dessen Autoren, unter der GPL-3.0</string>
+    <string name="nixie_settings_theme">Design</string>
+    <string name="nixie_settings_theme_sub">Wie Nixie aussieht. Der Wechsel wirkt sofort; Drive-in ist der Standard.</string>
+    <string name="nixie_theme_drivein">Drive-in</string>
+    <string name="nixie_theme_cinematic">Cinematic</string>
+    <string name="nixie_theme_editorial">Editorial</string>
+    <string name="nixie_theme_glacier">Glacier (Original)</string>
+    <string name="nixie_server_menu_remove">Von diesem Fernseher entfernen</string>
+    <string name="nixie_server_remove_title">%1$s von diesem Fernseher entfernen?</string>
+    <string name="nixie_server_remove_body">Seine Profile hier werden abgemeldet und vergessen. Die Konten auf dem Server bleiben, und der Server lässt sich wieder hinzufügen.</string>
+    <string name="nixie_server_remove">Entfernen</string>
+    <string name="nixie_server_removed">%1$s von diesem Fernseher entfernt</string>
+    <string name="nixie_server_removing">%1$s wird entfernt …</string>
+    <string name="nixie_signin_server_gone">Dieser Server ist nicht mehr auf diesem Fernseher. Wähle einen Server oder füge ihn wieder hinzu.</string>
+</resources>

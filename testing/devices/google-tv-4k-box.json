@@ -1,0 +1,1273 @@
+{
+  "schema": "nixie-device-answers/1",
+  "source": "measured",
+  "about": "A 4K Google TV box with an Amlogic chip and a 32-bit userspace, as Save device facts in a debug build measured it (2026-11-21). The test profile for such boxes: no 64-bit ABI, about 2 GB of RAM, 4K with HDR10, HLG and HDR10+, no DTS passthrough.",
+  "device": {
+    "model": "4K Google TV box (Amlogic, 32-bit userspace)",
+    "sdk": 34,
+    "release": "14"
+  },
+  "abis": [
+    "armeabi-v7a",
+    "armeabi"
+  ],
+  "abis64": [],
+  "memory": {
+    "lowRamDevice": false,
+    "memoryClassMb": 256,
+    "largeMemoryClassMb": 384,
+    "totalMb": 1917
+  },
+  "display": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 59.940059661865234,
+    "modes": [
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 59.940059661865234
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 60.000003814697266
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 59.940059661865234
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 60.000003814697266
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 50
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 29.970029830932617
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 30.000001907348633
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 25
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 23.976024627685547
+      },
+      {
+        "width": 3840,
+        "height": 2160,
+        "fps": 24.000001907348633
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 50
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.970029830932617
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 30.000001907348633
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 25
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 23.976024627685547
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fps": 24.000001907348633
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "fps": 59.940059661865234
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "fps": 60.000003814697266
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "fps": 50
+      }
+    ],
+    "hdr": [
+      "HDR10",
+      "HLG",
+      "HDR10Plus"
+    ]
+  },
+  "audioDirect": {
+    "ac3": true,
+    "eac3": true,
+    "eac3-joc": true,
+    "dts": false,
+    "dts-hd": false,
+    "truehd": true,
+    "ac4": true
+  },
+  "decoders": [
+    {
+      "name": "c2.android.aac.decoder",
+      "mime": "audio/mp4a-latm",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 2,
+          "level": 0
+        },
+        {
+          "profile": 5,
+          "level": 0
+        },
+        {
+          "profile": 29,
+          "level": 0
+        },
+        {
+          "profile": 23,
+          "level": 0
+        },
+        {
+          "profile": 39,
+          "level": 0
+        },
+        {
+          "profile": 20,
+          "level": 0
+        },
+        {
+          "profile": 42,
+          "level": 0
+        }
+      ],
+      "maxChannels": 8
+    },
+    {
+      "name": "OMX.google.aac.decoder",
+      "mime": "audio/mp4a-latm",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 2,
+          "level": 0
+        },
+        {
+          "profile": 5,
+          "level": 0
+        },
+        {
+          "profile": 29,
+          "level": 0
+        },
+        {
+          "profile": 23,
+          "level": 0
+        },
+        {
+          "profile": 39,
+          "level": 0
+        },
+        {
+          "profile": 20,
+          "level": 0
+        },
+        {
+          "profile": 42,
+          "level": 0
+        }
+      ],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.android.amrnb.decoder",
+      "mime": "audio/3gpp",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 1
+    },
+    {
+      "name": "OMX.google.amrnb.decoder",
+      "mime": "audio/3gpp",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 1
+    },
+    {
+      "name": "c2.android.amrwb.decoder",
+      "mime": "audio/amr-wb",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 1
+    },
+    {
+      "name": "OMX.google.amrwb.decoder",
+      "mime": "audio/amr-wb",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 1
+    },
+    {
+      "name": "c2.android.flac.decoder",
+      "mime": "audio/flac",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "OMX.google.flac.decoder",
+      "mime": "audio/flac",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.android.g711.alaw.decoder",
+      "mime": "audio/g711-alaw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "OMX.google.g711.alaw.decoder",
+      "mime": "audio/g711-alaw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "c2.android.g711.mlaw.decoder",
+      "mime": "audio/g711-mlaw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "OMX.google.g711.mlaw.decoder",
+      "mime": "audio/g711-mlaw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "c2.android.mp3.decoder",
+      "mime": "audio/mpeg",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 2
+    },
+    {
+      "name": "OMX.google.mp3.decoder",
+      "mime": "audio/mpeg",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 2
+    },
+    {
+      "name": "c2.android.opus.decoder",
+      "mime": "audio/opus",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "OMX.google.opus.decoder",
+      "mime": "audio/opus",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.android.raw.decoder",
+      "mime": "audio/raw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "OMX.google.raw.decoder",
+      "mime": "audio/raw",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.android.vorbis.decoder",
+      "mime": "audio/vorbis",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "OMX.google.vorbis.decoder",
+      "mime": "audio/vorbis",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.ac3",
+      "mime": "audio/ac3",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.ac4",
+      "mime": "audio/ac4",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 24
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.dts",
+      "mime": "audio/vnd.dts",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 6
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.dtse",
+      "mime": "audio/vnd.dts.hd;profile=lbr",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.dtshd",
+      "mime": "audio/vnd.dts.hd",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 8
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.eac3",
+      "mime": "audio/eac3",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 16
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.ffmpeg",
+      "mime": "audio/ffmpeg",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 30
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.mp1",
+      "mime": "audio/mpeg-L1",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 30
+    },
+    {
+      "name": "c2.amlogic.audio.decoder.mp2",
+      "mime": "audio/mpeg-L2",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxChannels": 30
+    },
+    {
+      "name": "c2.amlogic.av1.decoder",
+      "mime": "video/av01",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 8192
+        },
+        {
+          "profile": 4096,
+          "level": 8192
+        },
+        {
+          "profile": 8192,
+          "level": 8192
+        },
+        {
+          "profile": 2,
+          "level": 8192
+        }
+      ],
+      "maxWidth": 3840,
+      "maxHeight": 3840,
+      "uhd60": true,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.avc.decoder",
+      "mime": "video/avc",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 32768
+        },
+        {
+          "profile": 65536,
+          "level": 32768
+        },
+        {
+          "profile": 2,
+          "level": 32768
+        },
+        {
+          "profile": 8,
+          "level": 32768
+        },
+        {
+          "profile": 524288,
+          "level": 32768
+        }
+      ],
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "uhd60": false,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.dolby-vision.dav1.decoder",
+      "mime": "video/dolby-vision",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1024,
+          "level": 256
+        }
+      ],
+      "maxWidth": 3840,
+      "maxHeight": 3840,
+      "uhd60": true,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.dolby-vision.dvav.decoder",
+      "mime": "video/dolby-vision",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 512,
+          "level": 16
+        }
+      ],
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "uhd60": false,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.dolby-vision.dvhe.decoder",
+      "mime": "video/dolby-vision",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 16,
+          "level": 256
+        },
+        {
+          "profile": 32,
+          "level": 256
+        },
+        {
+          "profile": 256,
+          "level": 256
+        }
+      ],
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "uhd60": true,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.h263.decoder.sw",
+      "mime": "video/3gpp",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 16
+        },
+        {
+          "profile": 1,
+          "level": 8
+        },
+        {
+          "profile": 8,
+          "level": 16
+        },
+        {
+          "profile": 8,
+          "level": 8
+        }
+      ],
+      "maxWidth": 352,
+      "maxHeight": 288,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.hevc.decoder",
+      "mime": "video/hevc",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 131072
+        },
+        {
+          "profile": 2,
+          "level": 131072
+        },
+        {
+          "profile": 4096,
+          "level": 131072
+        },
+        {
+          "profile": 8192,
+          "level": 131072
+        },
+        {
+          "profile": 4,
+          "level": 131072
+        }
+      ],
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "uhd60": true,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.jpeg.decoder",
+      "mime": "image/jpeg",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": []
+    },
+    {
+      "name": "c2.amlogic.mjpeg.decoder",
+      "mime": "video/x-motion-jpeg",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 0,
+          "level": 0
+        }
+      ],
+      "maxWidth": 1920,
+      "maxHeight": 1920,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.mpeg2.decoder",
+      "mime": "video/mpeg2",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 0,
+          "level": 4
+        },
+        {
+          "profile": 1,
+          "level": 4
+        },
+        {
+          "profile": 3,
+          "level": 4
+        },
+        {
+          "profile": 4,
+          "level": 4
+        },
+        {
+          "profile": 5,
+          "level": 4
+        }
+      ],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.mpeg4.decoder",
+      "mime": "video/mp4v-es",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 128
+        },
+        {
+          "profile": 2,
+          "level": 128
+        },
+        {
+          "profile": 8,
+          "level": 128
+        },
+        {
+          "profile": 16,
+          "level": 128
+        },
+        {
+          "profile": 1024,
+          "level": 128
+        }
+      ],
+      "maxWidth": 896,
+      "maxHeight": 896,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.rm10.decoder.sw",
+      "mime": "video/rm10",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.rm20.decoder.sw",
+      "mime": "video/rm20",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.rm30.decoder.sw",
+      "mime": "video/rm30",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.rm40.decoder.sw",
+      "mime": "video/rm40",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.vc1.decoder.sw",
+      "mime": "video/vc1",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1280,
+      "maxHeight": 720,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.vp6a.decoder.sw",
+      "mime": "video/x-vnd.on2.vp6a",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.vp6f.decoder.sw",
+      "mime": "video/x-vnd.on2.vp6f",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.vp8.decoder.sw",
+      "mime": "video/x-vnd.on2.vp8",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 1
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.amlogic.vp9.decoder",
+      "mime": "video/x-vnd.on2.vp9",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 512
+        },
+        {
+          "profile": 4,
+          "level": 512
+        },
+        {
+          "profile": 4096,
+          "level": 512
+        },
+        {
+          "profile": 16384,
+          "level": 512
+        },
+        {
+          "profile": 8,
+          "level": 512
+        },
+        {
+          "profile": 8192,
+          "level": 512
+        },
+        {
+          "profile": 32768,
+          "level": 512
+        }
+      ],
+      "maxWidth": 4096,
+      "maxHeight": 4096,
+      "uhd60": true,
+      "uhd30": true,
+      "fhd60": true,
+      "tunneled": true
+    },
+    {
+      "name": "c2.amlogic.wmv3.decoder.sw",
+      "mime": "video/wmv3",
+      "hardware": true,
+      "softwareOnly": false,
+      "vendor": true,
+      "profileLevels": [],
+      "maxWidth": 1920,
+      "maxHeight": 1088,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.av1.decoder",
+      "mime": "video/av01",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 32768
+        },
+        {
+          "profile": 4096,
+          "level": 32768
+        },
+        {
+          "profile": 8192,
+          "level": 32768
+        },
+        {
+          "profile": 2,
+          "level": 32768
+        }
+      ],
+      "maxWidth": 1280,
+      "maxHeight": 1280,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.avc.decoder",
+      "mime": "video/avc",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 65536,
+          "level": 65536
+        },
+        {
+          "profile": 1,
+          "level": 65536
+        },
+        {
+          "profile": 2,
+          "level": 65536
+        },
+        {
+          "profile": 524288,
+          "level": 65536
+        },
+        {
+          "profile": 8,
+          "level": 65536
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.h264.decoder",
+      "mime": "video/avc",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 65536,
+          "level": 65536
+        },
+        {
+          "profile": 1,
+          "level": 65536
+        },
+        {
+          "profile": 2,
+          "level": 65536
+        },
+        {
+          "profile": 524288,
+          "level": 65536
+        },
+        {
+          "profile": 8,
+          "level": 65536
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.h263.decoder",
+      "mime": "video/3gpp",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 16
+        },
+        {
+          "profile": 1,
+          "level": 8
+        },
+        {
+          "profile": 8,
+          "level": 16
+        },
+        {
+          "profile": 8,
+          "level": 8
+        }
+      ],
+      "maxWidth": 352,
+      "maxHeight": 288,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.h263.decoder",
+      "mime": "video/3gpp",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 16
+        },
+        {
+          "profile": 1,
+          "level": 8
+        },
+        {
+          "profile": 8,
+          "level": 16
+        },
+        {
+          "profile": 8,
+          "level": 8
+        }
+      ],
+      "maxWidth": 352,
+      "maxHeight": 288,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.hevc.decoder",
+      "mime": "video/hevc",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 524288
+        },
+        {
+          "profile": 4,
+          "level": 524288
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.hevc.decoder",
+      "mime": "video/hevc",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 524288
+        },
+        {
+          "profile": 4,
+          "level": 524288
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.mpeg4.decoder",
+      "mime": "video/mp4v-es",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 256
+        }
+      ],
+      "maxWidth": 1344,
+      "maxHeight": 1344,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.mpeg4.decoder",
+      "mime": "video/mp4v-es",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 256
+        }
+      ],
+      "maxWidth": 1344,
+      "maxHeight": 1344,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.vp8.decoder",
+      "mime": "video/x-vnd.on2.vp8",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 1
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.vp8.decoder",
+      "mime": "video/x-vnd.on2.vp8",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 1
+        }
+      ],
+      "maxWidth": 2048,
+      "maxHeight": 2048,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": true,
+      "tunneled": false
+    },
+    {
+      "name": "c2.android.vp9.decoder",
+      "mime": "video/x-vnd.on2.vp9",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 256
+        },
+        {
+          "profile": 4,
+          "level": 256
+        },
+        {
+          "profile": 4096,
+          "level": 256
+        },
+        {
+          "profile": 16384,
+          "level": 256
+        }
+      ],
+      "maxWidth": 1280,
+      "maxHeight": 1280,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    },
+    {
+      "name": "OMX.google.vp9.decoder",
+      "mime": "video/x-vnd.on2.vp9",
+      "hardware": false,
+      "softwareOnly": true,
+      "vendor": false,
+      "profileLevels": [
+        {
+          "profile": 1,
+          "level": 256
+        },
+        {
+          "profile": 4,
+          "level": 256
+        },
+        {
+          "profile": 4096,
+          "level": 256
+        },
+        {
+          "profile": 16384,
+          "level": 256
+        }
+      ],
+      "maxWidth": 1280,
+      "maxHeight": 1280,
+      "uhd60": false,
+      "uhd30": false,
+      "fhd60": false,
+      "tunneled": false
+    }
+  ]
+}

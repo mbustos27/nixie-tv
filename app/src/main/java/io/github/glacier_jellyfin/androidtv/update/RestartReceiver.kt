@@ -18,6 +18,6 @@ class RestartReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         runCatching {
             context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.onFailure { Log.w("RestartReceiver", "Cannot reopen Glacier after the update", it) }
+        }.onFailure { Log.w("RestartReceiver", "Cannot reopen the app after the update", it) }
     }
 }

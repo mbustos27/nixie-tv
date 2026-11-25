@@ -1,0 +1,22 @@
+{
+  "schema": "nixie-device-answers/1",
+  "source": "expected",
+  "verified": false,
+  "about": "What the architecture plan expects of this box, from public reports. Every null is unknown until the box's own device-facts.json (Save device facts in a debug build) replaces this file.",
+  "device": {
+    "model": "Chromecast with Google TV (4K), 2020",
+    "chip": "Amlogic S905D3, 4x Cortex-A55 1.9 GHz, Mali-G31 MP2",
+    "notes": "32-bit userspace on an arm64 CPU (LineageOS sabrina): an arm64-only APK will not install."
+  },
+  "abis": ["armeabi-v7a", "armeabi"],
+  "abis64": null,
+  "memory": {
+    "lowRamDevice": null,
+    "memoryClassMb": null,
+    "largeMemoryClassMb": null,
+    "totalMb": 2048
+  },
+  "display": null,
+  "audioDirect": null,
+  "decoders": null
+}

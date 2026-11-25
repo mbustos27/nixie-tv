@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Nixie (tv-watchnext): Continue watching on the TV's home screen. Kept apart from Glacier's strings and Nixie's others. -->
+<resources>
+    <string name="nixie_watchnext_setting">Show Continue watching on the home screen</string>
+    <string name="nixie_watchnext_setting_sub">Some home screens don\'t show it, Google TV\'s own among them</string>
+</resources>

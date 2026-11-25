@@ -2,9 +2,8 @@ name: Fuzzing (weekly)
 
 # ClusterFuzzLite fuzzes every target of the :fuzz module for an hour and keeps
 # the corpus it grows as an artifact for the next run and for pull requests.
+# Nixie: no weekly schedule (the fork runs nothing by itself); start it by hand when wanted.
 on:
-  schedule:
-    - cron: '17 3 * * 6'
   workflow_dispatch:
 
 # A manual run while the weekly one is going would fuzz the same corpus twice.

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Asked before the log is offered on the network after a failed playback or a crash (NixieLogQuestion). -->
+<resources>
+    <string name="nixie_log_ask">Offer the log for download on this network?</string>
+    <string name="nixie_log_ask_crash">Nixie closed unexpectedly on %1$s. Offer its log for download on this network?</string>
+    <string name="nixie_yes">Yes</string>
+    <string name="nixie_no">No</string>
+    <!-- tv-1.0-r1: Settings › System › Diagnostics › Report a problem (NixieReportProblem). -->
+    <string name="nixie_report">Report a problem</string>
+    <string name="nixie_report_sub">Shows a code: scan it with a phone to open Nixie for TV\'s report form on GitHub, with the app\'s and the server\'s versions filled in. Nothing is sent from this TV.</string>
+    <string name="nixie_report_step_scan">Scan the code with a phone. It opens the Report a problem form on GitHub, with this app\'s and the server\'s versions filled in.</string>
+    <string name="nixie_report_step_say">Say what happened and how to make it happen again.</string>
+    <string name="nixie_report_step_log">To add the log, close this page, choose Download log on the network, and drag the file the phone saves into the form.</string>
+    <string name="nixie_report_app">Nixie for TV</string>
+    <string name="nixie_report_server">Jellyfin server</string>
+    <string name="nixie_report_unknown">Not known</string>
+    <string name="nixie_report_hint">Nothing is sent from this TV: the form opens on the phone, and you send it from there. Leave server addresses, user names and passwords out of it.</string>
+</resources>

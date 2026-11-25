@@ -15,8 +15,9 @@ import org.jellyfin.sdk.model.ClientInfo
 object AppModule {
 
     /** How Glacier identifies itself to Jellyfin servers (shown in the server's device list). */
+    // Nixie: the name the server's device list shows.
     @Provides
-    fun provideClientInfo(): ClientInfo = ClientInfo(name = "Glacier", version = BuildConfig.VERSION_NAME)
+    fun provideClientInfo(): ClientInfo = ClientInfo(name = "Nixie for TV", version = BuildConfig.VERSION_NAME)
 
     /** Audio the bundled FFmpeg decoder plays, announced to the server with the platform's decoders. */
     @Provides
@@ -27,5 +28,7 @@ object AppModule {
         versionName = BuildConfig.VERSION_NAME,
         feedUrl = BuildConfig.UPDATE_FEED.ifEmpty { ReleaseFeed.GITHUB },
         selfUpdate = BuildConfig.STORE.isEmpty(),
+        // Nixie: the release checks at start, debug and staging builds only when asked (app/build.gradle.kts).
+        autoCheckDefault = BuildConfig.UPDATE_CHECK_AT_START,
     )
 }

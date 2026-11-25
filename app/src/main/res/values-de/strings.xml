@@ -2,7 +2,7 @@
 <resources>
     <!-- Einrichtung: Server -->
     <string name="setup_welcome">Willkommen</string>
-    <string name="setup_intro">Verbinde dieses Gerät mit deinem Jellyfin-Server. Server im gleichen Netzwerk werden automatisch gefunden.</string>
+    <string name="setup_intro">Verbinde dieses Gerät mit dem Jellyfin-Server, den du nutzt. Server im gleichen Netzwerk werden automatisch gefunden.</string>
     <string name="setup_found_on_network">Im Netzwerk gefunden</string>
     <string name="setup_saved_servers">Gespeicherte Server</string>
     <string name="setup_searching">Suche im Netzwerk …</string>
@@ -413,7 +413,7 @@
     <string name="seerr_already_requested">Dieser Titel wurde schon angefragt.</string>
     <string name="seerr_request_failed">Die Anfrage konnte nicht gesendet werden.</string>
     <string name="seerr_quota_label">Verbleibende Anfragen</string>
-    <string name="seerr_request_hint">Die Anfrage geht über Seerr an deinen Server. Je nach Einstellung muss sie erst freigegeben werden. Danach erscheint der Titel von selbst in deiner Bibliothek.</string>
+    <string name="seerr_request_hint">Die Anfrage geht über Seerr an den Server. Je nach Einstellung muss sie erst freigegeben werden. Danach erscheint der Titel von selbst in deiner Bibliothek.</string>
     <plurals name="seerr_quota">
         <item quantity="one">%1$d von %2$d pro Tag</item>
         <item quantity="other">%1$d von %2$d in %3$d Tagen</item>
@@ -423,7 +423,7 @@
 
     <!-- Setup (redesign) -->
     <string name="address_heading">Server hinzufügen</string>
-    <string name="address_intro">Gib die Adresse deines Jellyfin-Servers ein, als Domain oder IP-Adresse.</string>
+    <string name="address_intro">Gib die Adresse des Jellyfin-Servers ein, den du nutzt, als Domain oder IP-Adresse.</string>
     <string name="address_hint">Glacier probiert zuerst HTTPS, dann HTTP, jeweils auf dem Standardport und auf %1$s. Für einen anderen Port %2$s anhängen.</string>
     <string name="address_port">Port</string>
     <string name="signin_intro">Melde dich mit deinem Jellyfin-Konto an. Dieses Gerät bleibt danach angemeldet.</string>
@@ -586,7 +586,6 @@
     <string name="trailer_again">Nochmal ansehen</string>
     <string name="trailer_to_details">Zu den Details</string>
     <string name="trailer_up_next">Als Nächstes</string>
-    <string name="trailer_forward">15 Sekunden vor</string>
     <string name="trailer_add_favorite">Zu Favoriten</string>
     <string name="trailer_error">Dieser Trailer lässt sich hier nicht abspielen.</string>
     <string name="trailer_none">Für diesen Titel gibt es keine abspielbaren Trailer.</string>

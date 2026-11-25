@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_home_up_next">Als Nächstes</string>
+    <string name="nixie_cw_remove_title">Aus „Weiter schauen“ entfernen?</string>
+    <string name="nixie_cw_remove">Entfernen</string>
+    <string name="nixie_cw_remove_body">%1$s verschwindet aus der Reihe. Die Fortsetzungsstelle geht auch, auf allen Geräten.</string>
+    <string name="nixie_cw_removed">Entfernt</string>
+    <string name="nixie_cw_undo">Auswählen zum Rückgängigmachen</string>
+    <string name="nixie_cw_not_removed">Der Server hat das Entfernen nicht angenommen, der Titel bleibt</string>
+    <string name="nixie_cw_changed_since">Inzwischen wurde er abgespielt, er bleibt, wie der Server ihn hat</string>
+    <string name="nixie_cw_not_put_back">Der Server hat das Rückgängigmachen nicht angenommen</string>
+    <string name="nixie_settings_hide_stale">Ausblenden, was nicht gespielt wurde seit</string>
+    <string name="nixie_settings_hide_stale_sub">Hält „Weiter schauen“ übersichtlich. Nur auf diesem Fernseher: Der Server behält alles.</string>
+    <string name="nixie_settings_never">Nie</string>
+    <string name="nixie_settings_days">%1$d Tagen</string>
+    <string name="nixie_settings_rewatching">Serien, die du noch einmal schaust</string>
+    <string name="nixie_settings_rewatching_sub">„Als Nächstes“ zeigt auch die nächste Folge einer Serie, die du neu begonnen hast</string>
+    <string name="nixie_hero">Großes Bild oben</string>
+    <string name="nixie_hero_sub">Neue Titel, die du noch nicht gesehen hast, dann „Als Nächstes“. Nie, was du gerade schaust: Das hat seine eigene Reihe.</string>
+    <string name="nixie_hero_off">Aus: Die Startseite beginnt mit ihren Reihen</string>
+    <string name="nixie_marked_watched_undo">Als gesehen markiert. Innerhalb von 10 Sekunden noch einmal auswählen, um es rückgängig zu machen.</string>
+    <string name="nixie_season_marked_watched_undo">Staffel als gesehen markiert. Innerhalb von 10 Sekunden noch einmal wählen, um es rückgängig zu machen.</string>
+    <string name="nixie_watched_undone">Wieder wie vorher</string>
+    <string name="nixie_watched_undone_partly">Wieder wie vorher, außer Folgen, die inzwischen gespielt wurden</string>
+    <string name="nixie_watched_not_undone">Der Server hat das Rückgängigmachen nicht angenommen</string>
+    <string name="nixie_top_bar">Obere Leiste</string>
+    <string name="nixie_top_bar_starred">In der oberen Leiste</string>
+    <string name="nixie_top_bar_full">Höchstens 3: Nimm erst einer anderen den Stern</string>
+    <string name="nixie_top_bar_star">Mit Stern kommt sie in die obere Leiste</string>
+    <string name="nixie_home_cw_empty">Noch nichts angefangen.</string>
+    <string name="nixie_home_up_next_empty">Noch keine nächsten Folgen.</string>
+    <string name="nixie_home_empty_title">Noch nichts zum Weiterschauen</string>
+    <string name="nixie_home_empty_body">Öffne oben in der Leiste eine Bibliothek, um etwas zum Ansehen zu finden. Was du anfängst, erscheint hier.</string>
+    <string name="nixie_collections_none">Der Server führt keine Sammlungen.</string>
+    <string name="nixie_settings_nav_collections_sub">Alle Sammlungen auf dem Server, von A bis Z</string>
+    <string name="nixie_nav_libraries">Bibliotheken</string>
+    <string name="nixie_settings_nav_libraries_sub">Jede Bibliothek auf dem Server, eine Karte für jede</string>
+    <string name="nixie_libraries_none">Der Server führt keine Bibliotheken.</string>
+    <plurals name="nixie_libraries_count">
+        <item quantity="one">%d Bibliothek</item>
+        <item quantity="other">%d Bibliotheken</item>
+    </plurals>
+    <!-- tv-1.0-r1: the Collections page's order button, the list's direction in words. -->
+    <string name="nixie_order_a_to_z">A bis Z</string>
+    <string name="nixie_order_z_to_a">Z bis A</string>
+    <string name="nixie_order_newest">Neueste zuerst</string>
+    <string name="nixie_order_oldest">Älteste zuerst</string>
+    <string name="nixie_order_highest">Best bewertete zuerst</string>
+    <string name="nixie_order_lowest">Schlechtest bewertete zuerst</string>
+    <string name="nixie_order_longest">Längste zuerst</string>
+    <string name="nixie_order_shortest">Kürzeste zuerst</string>
+</resources>

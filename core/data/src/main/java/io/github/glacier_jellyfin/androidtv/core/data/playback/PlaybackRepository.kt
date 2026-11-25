@@ -1,6 +1,5 @@
 package io.github.glacier_jellyfin.androidtv.core.data.playback
 
-import android.content.res.Resources
 import io.github.glacier_jellyfin.androidtv.core.data.Session
 import io.github.glacier_jellyfin.androidtv.core.data.SessionManager
 import io.github.glacier_jellyfin.androidtv.core.data.media.MusicTrack
@@ -22,6 +21,9 @@ import io.github.glacier_jellyfin.androidtv.core.jellyfin.runSuspendCatching
 import io.github.glacier_jellyfin.androidtv.core.log.DebugOptions
 import io.github.glacier_jellyfin.androidtv.core.log.DebugThrottle
 import io.github.glacier_jellyfin.androidtv.core.log.Log
+import io.github.mbustos27.nixie.tv.data.play.DisplayPanel
+import io.github.mbustos27.nixie.tv.data.play.pictureOnlyCopied
+import io.github.mbustos27.nixie.tv.data.watchnext.WatchNextProgress
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URI
@@ -227,6 +229,8 @@ class PlaybackRepository @Inject constructor(
     private val settings: SettingsRepository,
     private val serverPreferences: ServerPreferencesRepository,
     private val jellyfin: Jellyfin,
+    // Nixie (tv-player-4k): the panel's size from the display mode, not the UI's (TV-S7).
+    private val panel: DisplayPanel,
 ) {
 
     /** Reports must outlive the player screen: "stopped" is sent while it closes. */
@@ -254,6 +258,13 @@ class PlaybackRepository @Inject constructor(
      * Live TV channels have neither, so they never show up here.
      */
     val stopped: SharedFlow<UUID> = _stopped.asSharedFlow()
+
+    // Nixie (tv-watchnext): each video position the server took, for that title's row on the TV's home screen.
+    private val _nixieProgress = MutableSharedFlow<WatchNextProgress>(extraBufferCapacity = 8)
+    val nixieProgress: SharedFlow<WatchNextProgress> = _nixieProgress.asSharedFlow()
+
+    /** Nixie (tv-watchnext): videos only (music has no file, Live TV no resume point). */
+    private fun nixieVideo(source: PlaybackSource) = !source.live && source.file != null
 
     /**
      * What the server may send this device, after the [playback] settings
@@ -289,10 +300,8 @@ class PlaybackRepository @Inject constructor(
     }
 
     /** The display's width and height in pixels, landscape. */
-    private fun displaySize(): Pair<Int, Int> {
-        val metrics = Resources.getSystem().displayMetrics
-        return maxOf(metrics.widthPixels, metrics.heightPixels) to minOf(metrics.widthPixels, metrics.heightPixels)
-    }
+    // Nixie (tv-player-4k): the display mode's size; the UI's size says 1080p on a 4K TV (TV-S7).
+    private fun displaySize(): Pair<Int, Int> = panel.size()
 
     /** What this device decodes and passes on, for the player's setup. */
     val device: DeviceCapabilities get() = capabilities.capabilities
@@ -860,7 +869,11 @@ class PlaybackRepository @Inject constructor(
                 val first = info.mediaSources.firstOrNull() ?: return@run
                 val video = first.mediaStreams.orEmpty().firstOrNull { it.type == MediaStreamType.VIDEO }
                 val (displayWidth, displayHeight) = displaySize()
-                val bigger = (video?.width ?: 0) > displayWidth || (video?.height ?: 0) > displayHeight
+                // Nixie (tv-player-4k): a picture the server only copies (the audio alone converted) is left as it is: the
+                // device decodes it, and re-encoding it for the display would be the server's work for nothing.
+                val reasons = first.transcodingUrl?.let { TRANSCODE_REASONS.find(it)?.groupValues?.get(1) }
+                val bigger = ((video?.width ?: 0) > displayWidth || (video?.height ?: 0) > displayHeight) &&
+                    !pictureOnlyCopied(reasons)
                 if (info.errorCode == null && copyDemand == null && bigger && !first.supportsDirectPlay &&
                     !first.supportsDirectStream &&
                     first.liveStreamId == null
@@ -1090,6 +1103,9 @@ class PlaybackRepository @Inject constructor(
                     // The height the server delivers, not the one asked for (960x540 for a 1008x560 box).
                     ladder != null -> ladder.deliveredHeights[resolutions[startTier]] ?: resolutions[startTier].height
 
+                    // Nixie (tv-player-4k): only the audio converted, the picture copied at its own height.
+                    method == PlaybackMethod.Transcode && pictureOnlyCopied(reasons) -> sourceVideo?.height
+
                     method == PlaybackMethod.Transcode -> sourceVideo?.height?.let { minOf(it, displayHeight) }
 
                     else -> null
@@ -1296,7 +1312,15 @@ class PlaybackRepository @Inject constructor(
             .forEach { id -> reportScope.launch { stopTierJob(id) } }
     }
 
-    fun reportProgress(source: PlaybackSource, position: PlaybackPosition) = report("progress") {
+    fun reportProgress(source: PlaybackSource, position: PlaybackPosition) = report(
+        "progress",
+        // Nixie (tv-watchnext): each position the server took, for the playing title's home screen row.
+        onDone = {
+            if (nixieVideo(source)) {
+                _nixieProgress.tryEmit(WatchNextProgress(source.itemId, position.positionMs, position.paused))
+            }
+        },
+    ) {
         sessionApi.reportPlaybackProgress(
             PlaybackProgressInfo(
                 canSeek = !source.live,
@@ -1325,7 +1349,16 @@ class PlaybackRepository @Inject constructor(
         positionMs: Long,
         failed: Boolean = false,
         watched: Boolean = false,
-    ) = report("stopped", onDone = { if (!source.live) _stopped.tryEmit(source.itemId) }) {
+    ) = report(
+        "stopped",
+        onDone = {
+            if (!source.live) _stopped.tryEmit(source.itemId)
+            // Nixie (tv-watchnext): the last position of a video not finished, written at once.
+            if (nixieVideo(source) && !watched) {
+                _nixieProgress.tryEmit(WatchNextProgress(source.itemId, positionMs, final = true))
+            }
+        },
+    ) {
         sendStopped(source, positionMs, failed, watched)
     }.also { endTierJobs(source) }
 

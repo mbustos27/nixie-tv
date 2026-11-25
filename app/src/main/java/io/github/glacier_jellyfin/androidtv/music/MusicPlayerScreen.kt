@@ -128,6 +128,7 @@ import io.github.glacier_jellyfin.androidtv.ui.Artwork
 import io.github.glacier_jellyfin.androidtv.ui.CollectEvents
 import io.github.glacier_jellyfin.androidtv.ui.HoldOkMark
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
+import io.github.mbustos27.nixie.tv.designsystem.NixieVisuals
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
@@ -702,8 +703,16 @@ private fun BoxScope.SongFullscreen(
     listState: LazyListState,
 ) {
     // Blur needs Android 12; older devices darken the sharp cover a little more instead.
-    val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    Artwork(track.largeCoverUrl, Modifier.fillMaxSize().then(if (blurs) Modifier.blur(56.dp) else Modifier))
+    // Nixie: a live blur only where the box affords it; elsewhere a pre-blurred (tiny, scaled-up) cover (NixieVisuals).
+    val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && NixieVisuals.current.liveBlur
+    val cover = if (blurs) {
+        track.largeCoverUrl
+    } else {
+        NixieVisuals.current.blurredImageWidth
+            ?.let { NixieVisuals.preBlurred(track.largeCoverUrl, it) }
+            ?: track.largeCoverUrl
+    }
+    Artwork(cover, Modifier.fillMaxSize().then(if (blurs) Modifier.blur(56.dp) else Modifier))
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (blurs) 0.6f else 0.78f)))
     val lyrics = lyricsForFullscreen(state)
     Box(Modifier.fillMaxSize().padding(bottom = FULLSCREEN_BAR.dp)) {

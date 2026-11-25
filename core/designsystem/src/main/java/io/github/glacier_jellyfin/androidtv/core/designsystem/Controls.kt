@@ -43,8 +43,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
-val PillShape = RoundedCornerShape(percent = 50)
+// Nixie: a theme without oblong pills (Drive-in) gives its own shape.
+val PillShape: Shape get() = NixieTheme.tokens.pill ?: GlacierPill
+
+private val GlacierPill = RoundedCornerShape(percent = 50)
 
 /**
  * The large pill buttons of the design (`bigBtn`): accent-deep when

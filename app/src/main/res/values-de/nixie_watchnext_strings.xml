@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Nixie contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="nixie_watchnext_setting">„Weiter schauen“ auf dem Startbildschirm zeigen</string>
+    <string name="nixie_watchnext_setting_sub">Manche Startbildschirme zeigen es nicht, auch der von Google TV</string>
+</resources>

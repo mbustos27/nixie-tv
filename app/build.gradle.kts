@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    // Nixie: start-up and Home compiled ahead of time from a baseline profile (:baselineprofile).
+    id("androidx.baselineprofile")
 }
 
 /**
@@ -126,6 +128,50 @@ android {
         stores.forEach { getByName(it).manifest.srcFile("src/store/AndroidManifest.xml") }
     }
 
+    // Nixie: one flavor carries the rebrand (src/nixie: the name, banner and icon), Nixie's application id and
+    // Nixie's version, so Glacier's lines above stay as they are. Debug keeps Glacier's ".debug" suffix.
+    flavorDimensions += "brand"
+    productFlavors {
+        create("nixie") {
+            dimension = "brand"
+            applicationId = "io.github.mbustos27.nixie.tv"
+            val nixieVersion = providers.gradleProperty("nixie.version").get()
+            versionName = nixieVersion
+            versionCode = versionCodeOf(nixieVersion)
+            // Nixie's own releases. Debug and staging builds look there only when asked (Settings > System), never
+            // by themselves; the release checks at every start (below).
+            buildConfigField(
+                "String",
+                "UPDATE_FEED",
+                "\"https://api.github.com/repos/mbustos27/nixie-tv/releases?per_page=30\"",
+            )
+            buildConfigField("boolean", "UPDATE_CHECK_AT_START", "false")
+        }
+    }
+    // Nixie: the release is one APK for real boxes, 32- and 64-bit ARM (some current 4K Google TV boxes and the 2020
+    // Chromecast run a 32-bit userspace); debug keeps every ABI for the x86 emulator. tools/release-check expects
+    // exactly these.
+    // From 1.0 (the owner, 2026-11-25) the release checks for updates at every start, until the user turns it off in
+    // Settings > System; a build type's field wins over the flavor's.
+    buildTypes.named("release") {
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
+        buildConfigField("boolean", "UPDATE_CHECK_AT_START", "true")
+    }
+    // Nixie (integration 1): the release-like staging build (R8, optimised, signed with the debug key) for speed checks
+    // on a real box. -Pnixie.stagingAsDebug=true gives it the debug build's application id, so it installs
+    // over Nixie debug and keeps its sign-ins (docs/RELEASING.md, "A release-like build for a box"). It never checks
+    // for updates by itself, so the basics gate and speed checks never ask GitHub or meet the update dialog.
+    buildTypes.named("staging") {
+        if (providers.gradleProperty("nixie.stagingAsDebug").orNull == "true") applicationIdSuffix = ".debug"
+        buildConfigField("boolean", "UPDATE_CHECK_AT_START", "false")
+    }
+    // Nixie (tv-log-pull, integration 1): the adb log's receiver and provider (src/debug) in the staging build too, so
+    // tools/pull-tv-log.ps1 works on it; in no release or store build (AdbLogManifestTest).
+    sourceSets.named("staging") {
+        manifest.srcFile("src/debug/AndroidManifest.xml")
+        kotlin.srcDir("src/debug/java")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -142,10 +188,38 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // Nixie: the baseline profile's builds install beside the debug one and are signed with the debug key (a release
+    // key never enters Gradle); release builds stay unsigned.
+    buildTypes.matching { it.name.startsWith("nonMinified") || it.name.startsWith("benchmark") }.configureEach {
+        signingConfig = signingConfigs.getByName("debug")
+    }
+
+    // Nixie: the theme screenshots need the app's resources, and always write their images
+    // (app/build/outputs/roborazzi/<theme>/<screen>.png).
+    testOptions.unitTests {
+        isIncludeAndroidResources = true
+        all { it.systemProperty("roborazzi.test.record", "true") }
+    }
+}
+
+// Nixie (integration 1): the staging build takes the release's baseline profile (src/nixieRelease) too, so a box's
+// speed check runs what 1.0 ships; without it staging carried only the libraries' profiles.
+androidComponents {
+    onVariants(selector().withName("nixieStaging")) { variant ->
+        variant.sources.baselineProfiles?.addStaticSourceDirectory("src/nixieRelease/generated/baselineProfiles")
+    }
 }
 
 dependencies {
     implementation(project(":core:designsystem"))
+    // Nixie: the baseline profile installer, and the module that generates the profile.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    baselineProfile(project(":baselineprofile"))
+    // Nixie: the themes, registered in NixieThemes.
+    implementation(project(":theme:drivein"))
+    implementation(project(":theme:cinematic"))
+    implementation(project(":theme:editorial"))
     implementation(project(":core:data"))
     implementation(project(":core:player"))
     implementation(libs.media3.session)
@@ -179,4 +253,24 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+
+    // Nixie: JVM screenshots of every theme (Robolectric + Roborazzi), no emulator needed: ThemeShotsTest.
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.78.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.78.0")
+
+    // Nixie (play stream): the player's hooks tested through the real PlayerViewModel (PlayerHooksTest).
+    testImplementation("io.mockk:mockk:1.14.11")
+    testImplementation(libs.kotlinx.coroutines.test)
+    // Nixie (TV-S13): SlowServerPathsTest runs the SDK's own requests, which log through kotlin-logging (slf4j), as in
+    // core/data's tests.
+    testRuntimeOnly("org.slf4j:slf4j-api:1.7.30")
+}
+
+// Nixie (play stream): SearchServerTest runs the TV test server (testing/fakeserver); a change there runs the tests again.
+tasks.withType<Test>().configureEach {
+    inputs.dir(rootProject.layout.projectDirectory.dir("testing/fakeserver")).withPathSensitivity(PathSensitivity.RELATIVE)
 }

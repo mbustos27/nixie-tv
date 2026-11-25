@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Typography
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 
 private fun googleSans(weight: FontWeight) = Font(
     resId = R.font.google_sans,
@@ -55,7 +56,8 @@ object GlacierText {
     @Composable
     @ReadOnlyComposable
     fun display(size: Int) = TextStyle(
-        fontFamily = GoogleSans,
+        // Nixie: a theme's display face (Editorial's serif), Google Sans otherwise.
+        fontFamily = NixieTheme.tokens.displayFont ?: GoogleSans,
         fontWeight = FontWeight.SemiBold,
         fontSize = size.sp,
         letterSpacing = 0.005.em,

@@ -29,7 +29,7 @@ class ListArrangementTest {
         LibraryQuery(LibraryKind.Movies, sort = sort, descending = descending)
 
     @Test
-    fun `groups in order, names A to Z inside, unknown last`() {
+    fun `groups in order, names A to Z inside, unknown first going up`() {
         val entries = listOf(
             entry("Zulu", 2020),
             entry("Alpha", 2021),
@@ -38,9 +38,18 @@ class ListArrangementTest {
             entry("Bravo", 2020),
         )
         val list = ListArrangement.arrange(entries, movies(LibrarySort.Year))
-        assertEquals(listOf("Bravo", "Mike", "Zulu", "Alpha", "None"), list.entries.map { it.name })
-        assertEquals(ListGroup.Year(2020), list.groups!![0])
-        assertEquals(ListGroup.Unknown, list.groups!!.last())
+        // Nixie (TV-S1): the titles without a value first going up, as on the server (Glacier had them last).
+        assertEquals(listOf("None", "Bravo", "Mike", "Zulu", "Alpha"), list.entries.map { it.name })
+        assertEquals(ListGroup.Unknown, list.groups!!.first())
+        assertEquals(ListGroup.Year(2020), list.groups!![1])
+    }
+
+    @Test
+    fun `by a name going up, the titles without one stay last`() {
+        // Nixie (TV-S1): only the sorts by a value page from the server, which has the titles without one first.
+        val songs = listOf(entry("Song", artist = null), entry("Other", artist = "Abba"))
+        val byArtist = ListArrangement.arrange(songs, LibraryQuery(LibraryKind.Music, sort = LibrarySort.Artist))
+        assertEquals(ListGroup.Unknown, byArtist.groups!!.last())
     }
 
     @Test

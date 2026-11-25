@@ -4,6 +4,9 @@ import androidx.datastore.core.DataStore
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.ServerInfo
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.SignedInUser
 import io.github.glacier_jellyfin.androidtv.core.log.Log
+import io.github.mbustos27.nixie.tv.data.NamesSeen
+import io.github.mbustos27.nixie.tv.data.nixieWithNamesSeen
+import io.github.mbustos27.nixie.tv.data.withDeviceIdPinned
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -18,24 +21,33 @@ class AccountRepository @Inject constructor(private val store: DataStore<Account
     suspend fun current(): AccountState = store.data.first()
 
     suspend fun rememberServer(server: ServerInfo) {
-        store.updateData { it.withServer(server, now()) }
+        update { it.withServer(server, now()) }
     }
 
     suspend fun rememberSignIn(user: SignedInUser) {
-        store.updateData { it.withSignIn(user, now()) }
+        update { it.withSignIn(user, now()) }
     }
 
     suspend fun markUsed(serverId: String, userId: String) {
-        store.updateData { it.updateUser(serverId, userId) { user -> user.copy(lastUsedAt = now()) } }
+        update { it.updateUser(serverId, userId) { user -> user.copy(lastUsedAt = now()) } }
+    }
+
+    // Nixie: a sign-in from before device ids per sign-in keeps the install's id, written down once.
+    suspend fun pinDeviceId(
+        serverId: String,
+        userId: String,
+        installId: String,
+    ) {
+        update { it.withDeviceIdPinned(serverId, userId, installId) }
     }
 
     /** Keeps the profile listed but drops its credential. */
     suspend fun forgetToken(serverId: String, userId: String) {
-        store.updateData { it.updateUser(serverId, userId) { user -> user.copy(accessToken = null) } }
+        update { it.updateUser(serverId, userId) { user -> user.copy(accessToken = null) } }
     }
 
     suspend fun removeUser(serverId: String, userId: String) {
-        store.updateData { it.withoutUser(serverId, userId) }
+        update { it.withoutUser(serverId, userId) }
     }
 
     suspend fun setPin(
@@ -44,12 +56,12 @@ class AccountRepository @Inject constructor(private val store: DataStore<Account
         pin: String,
     ) {
         val hash = withContext(Dispatchers.Default) { Pins.hash(pin) }
-        store.updateData { it.updateUser(serverId, userId) { user -> user.copy(pin = hash, pinChangedAt = now()) } }
+        update { it.updateUser(serverId, userId) { user -> user.copy(pin = hash, pinChangedAt = now()) } }
     }
 
     /** Drops the PIN and every lock that needs it; the age limit stays. */
     suspend fun removePin(serverId: String, userId: String) {
-        store.updateData {
+        update {
             it.updateUser(serverId, userId) { user ->
                 user.copy(
                     pin = null,
@@ -69,7 +81,7 @@ class AccountRepository @Inject constructor(private val store: DataStore<Account
         userId: String,
         transform: (Protection) -> Protection,
     ) {
-        store.updateData {
+        update {
             it.updateUser(serverId, userId) { user -> user.copy(protection = transform(user.protection)) }
         }
     }
@@ -84,14 +96,14 @@ class AccountRepository @Inject constructor(private val store: DataStore<Account
         val ok = withContext(Dispatchers.Default) { Pins.verify(pin, stored) }
         if (ok && Pins.outdated(stored)) {
             val hash = withContext(Dispatchers.Default) { Pins.hash(pin) }
-            store.updateData { it.updateUser(serverId, userId) { user -> user.copy(pin = hash) } }
+            update { it.updateUser(serverId, userId) { user -> user.copy(pin = hash) } }
             Log.i(TAG, "PIN hash redone with ${hash.iterations} instead of ${stored.iterations} iterations")
         }
         return ok
     }
 
     suspend fun setStartProfile(startProfile: StartProfile) {
-        store.updateData { it.copy(startProfile = startProfile) }
+        update { it.copy(startProfile = startProfile) }
     }
 
     /** [server] was set up again at the address of [oldId]; see [withServerReplaced]. */
@@ -100,11 +112,27 @@ class AccountRepository @Inject constructor(private val store: DataStore<Account
         server: ServerInfo,
         kept: Map<String, String>,
     ) {
-        store.updateData { it.withServerReplaced(oldId, server, kept, now()) }
+        update { it.withServerReplaced(oldId, server, kept, now()) }
     }
 
     suspend fun removeServer(serverId: String) {
-        store.updateData { it.withoutServer(serverId) }
+        update { it.withoutServer(serverId) }
+    }
+
+    /**
+     * Nixie (tv-1.0-privacy): the names of servers and profiles kept for the log's anonymiser, forgotten: the log they
+     * were kept for was cleared. (Clearing the app's data takes them with the accounts.)
+     */
+    suspend fun nixieForgetNamesSeen() {
+        store.updateData { it.copy(nixieSeen = NamesSeen()) }
+    }
+
+    /**
+     * Nixie (tv-1.0-privacy): every change keeps the server and profile names it had before and after it
+     * ([nixieWithNamesSeen]): the shared log's anonymiser still finds a removed one in older lines.
+     */
+    private suspend fun update(transform: (AccountState) -> AccountState) {
+        store.updateData { before -> transform(before).nixieWithNamesSeen(before) }
     }
 
     private fun now() = System.currentTimeMillis()

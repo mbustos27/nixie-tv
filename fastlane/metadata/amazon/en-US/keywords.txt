@@ -1,1 +1,0 @@
-jellyfin, mediaserver, mediaplayer, hometheater, selfhosted, movies, series, music, liveTV, opensource

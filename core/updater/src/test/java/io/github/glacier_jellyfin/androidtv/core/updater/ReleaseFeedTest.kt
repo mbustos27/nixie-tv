@@ -51,9 +51,9 @@ class ReleaseFeedTest {
 
     @Test
     fun `selected release keeps its notes`() {
-        val releases = ReleaseFeed.parse(
-            """[{ "tag_name": "v1.3.0", "body": "- Fix", "assets": [{ "name": "glacier-androidtv-1.3.0.apk", "browser_download_url": "u", "size": 1 }] }]""",
-        )
+        // Nixie: the asset is named as Nixie for TV's releases name it (ReleaseSelector.nixieApkName).
+        val asset = """{ "name": "Nixie-TV-1.3.0.apk", "browser_download_url": "u", "size": 1 }"""
+        val releases = ReleaseFeed.parse("""[{ "tag_name": "v1.3.0", "body": "- Fix", "assets": [$asset] }]""")
         val candidate = ReleaseSelector.select(releases, AppVersion(1, 2, 0), UpdateChannel.Stable)
         assertEquals("- Fix", candidate?.release?.body)
         assertNull(candidate?.apk?.digest)

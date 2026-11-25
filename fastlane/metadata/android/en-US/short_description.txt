@@ -1,1 +1,0 @@
-Your Jellyfin server on the TV. Built for the remote, with lossless sound

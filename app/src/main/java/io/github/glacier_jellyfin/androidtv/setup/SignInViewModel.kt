@@ -61,7 +61,9 @@ class SignInViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val stored = accounts.current().servers.firstOrNull { it.id == route.serverId } ?: return@launch
+            // Nixie (tv-fix-a): a server removed from the TV meanwhile: say so and go to the server list.
+            val stored =
+                accounts.current().servers.firstOrNull { it.id == route.serverId } ?: return@launch serverGone()
             val server = ServerInfo(stored.id, stored.name, stored.address, stored.version)
             _state.update { it.copy(server = server) }
             val available = authenticator.isQuickConnectEnabled(server)
@@ -87,7 +89,11 @@ class SignInViewModel @Inject constructor(
     fun signIn() {
         val current = _state.value
         if (current.busy) return
-        val server = current.server ?: return
+        // Nixie (tv-fix-a): never a Sign in that does nothing: no server saved for this page any more.
+        val server = current.server ?: run {
+            viewModelScope.launch { if (accounts.current().servers.none { it.id == route.serverId }) serverGone() }
+            return
+        }
         if (current.username.isBlank()) {
             viewModelScope.launch { _events.send(UiEvent.Toast(R.string.signin_username_required)) }
             _state.update { it.copy(field = SignInField.Username) }
@@ -114,6 +120,12 @@ class SignInViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Nixie (tv-fix-a): the page's server is no longer on this TV: said, then the server list. */
+    private suspend fun serverGone() {
+        _events.send(UiEvent.Toast(R.string.nixie_signin_server_gone))
+        _events.send(UiEvent.Navigate(ServerListRoute, clearBackStack = true))
     }
 
     private suspend fun finish(user: SignedInUser) {

@@ -47,7 +47,7 @@ internal class ApkInstaller(private val context: Context) {
         )
         true
     } catch (e: ActivityNotFoundException) {
-        Log.w(TAG, "No page to allow installs from Glacier", e)
+        Log.w(TAG, "No page to allow installs from this app", e)
         false
     }
 

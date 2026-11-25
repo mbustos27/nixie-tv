@@ -1,5 +1,6 @@
 package io.github.glacier_jellyfin.androidtv.core.data.playback
 
+import io.github.mbustos27.nixie.tv.data.skips.SegmentSource
 import kotlinx.serialization.Serializable
 
 /** Parts of a video the server knows about (Jellyfin media segments). */
@@ -10,6 +11,8 @@ data class MediaSegment(
     val kind: SegmentKind,
     val startMs: Long,
     val endMs: Long,
+    // Nixie: where the skip came from: the server, the file's chapters, an online lookup or a learned skip.
+    val source: SegmentSource = SegmentSource.Server,
 ) {
     operator fun contains(positionMs: Long): Boolean = positionMs in startMs until endMs
 }

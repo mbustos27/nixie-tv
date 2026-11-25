@@ -55,6 +55,9 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.GlacierText
 import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.ui.Artwork
+import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.designsystem.nixiePanelChrome
+import io.github.mbustos27.nixie.tv.play.skipSource
 
 /**
  * [sampleMs] smoothed into a display value that runs on every frame while [playing]
@@ -102,7 +105,19 @@ fun SkipButton(
     val remaining by remember(segment) {
         derivedStateOf { (segment.endMs - position.longValue).coerceAtLeast(0) / 1000 * 1000 }
     }
-    GlacierClickable(onClick = onClick, shape = PillShape, modifier = modifier) { focused ->
+    GlacierClickable(
+        onClick = onClick,
+        shape = PillShape,
+        // Nixie: the description says where the skip came from.
+        modifier = modifier.skipSource(segment.kind.skipLabel(), segment.source),
+    ) { focused ->
+        // Nixie: a theme's Skip button face (NixieSlots.player.skipButton) in Glacier's clickable.
+        NixieTheme.slots.player.skipButton?.let { face ->
+            face(stringResource(segment.kind.skipLabel()), focused, remaining / 1000) {
+                ((position.longValue - segment.startMs).toFloat() / (segment.endMs - segment.startMs)).coerceIn(0f, 1f)
+            }
+            return@GlacierClickable
+        }
         val color = if (focused) GlacierColors.Void else GlacierColors.Ice
         Row(
             Modifier
@@ -176,12 +191,15 @@ fun UpNextCard(
     Column(
         modifier
             .width(520.dp)
-            .clip(shape)
-            // Dark base under the glass, as in the top navigation: on a bright
-            // scene the accent label and the grey line kept too little contrast.
-            .background(GlacierColors.Deep.copy(alpha = 0.72f))
-            .background(GlacierColors.GlassFill2)
-            .border(1.dp, GlacierColors.GlassBorder2, shape)
+            // Nixie: a theme's panel chrome (NixieSlots.player.panelChrome).
+            .nixiePanelChrome {
+                clip(shape)
+                    // Dark base under the glass, as in the top navigation: on a bright
+                    // scene the accent label and the grey line kept too little contrast.
+                    .background(GlacierColors.Deep.copy(alpha = 0.72f))
+                    .background(GlacierColors.GlassFill2)
+                    .border(1.dp, GlacierColors.GlassBorder2, shape)
+            }
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -192,15 +210,23 @@ fun UpNextCard(
             }
             val seconds = remainingMs / 1000
             val remaining = if (seconds >= 60) formatTime(remainingMs) else "$seconds s"
-            Text(
-                stringResource(R.string.up_next_in, remaining).uppercase(),
+            // Nixie: a theme's countdown line (NixieSlots.player.upNextCountdown); without autoplay the card says "Up next",
+            // with no countdown.
+            val countdownText = if (countdown.autoPlay) {
+                stringResource(R.string.up_next_in, remaining)
+            } else {
+                stringResource(R.string.nixie_up_next)
+            }
+            val countdownSeconds = if (countdown.autoPlay) seconds else null
+            NixieTheme.slots.player.upNextCountdown?.invoke(countdownText, countdownSeconds) ?: Text(
+                countdownText.uppercase(),
                 style = GlacierText.body(16, FontWeight.Bold).copy(letterSpacing = 0.09.em),
                 color = accent,
             )
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
+                    .height(if (countdown.autoPlay) 4.dp else 0.dp) // Nixie: no bar without autoplay
                     .clip(PillShape)
                     .background(GlacierColors.GlassFill2)
                     .drawBehind {

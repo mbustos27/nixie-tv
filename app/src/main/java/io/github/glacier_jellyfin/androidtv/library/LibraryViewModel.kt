@@ -39,6 +39,13 @@ import io.github.glacier_jellyfin.androidtv.navigation.NavTarget
 import io.github.glacier_jellyfin.androidtv.navigation.navEvent
 import io.github.glacier_jellyfin.androidtv.navigation.routeFor
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.data.library.NixieLibraryPaging
+import io.github.mbustos27.nixie.tv.library.NixieCollectionsPage
+import io.github.mbustos27.nixie.tv.library.NixieLibraryTimings
+import io.github.mbustos27.nixie.tv.library.NixieRailLetters
+import io.github.mbustos27.nixie.tv.library.NixieServerList
+import io.github.mbustos27.nixie.tv.library.nixieFilterKey
+import io.github.mbustos27.nixie.tv.library.nixieFirstPage
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -81,11 +88,27 @@ data class LibraryState(
     /** The folder shown in the folder view, its subfolders and videos in the tab's order. */
     val folder: FolderContent? = null,
     val viewMenuOpen: Boolean = false,
+    /**
+     * Nixie (TV-S1): [items] came from the server in its own order while the index was not in memory; the next
+     * pages follow it, and a jump starts the list anew in the app's order.
+     */
+    val serverOrder: Boolean = false,
+    /**
+     * Nixie (TV-S13): [items] start at this letter's first title (an A–Z jump's page, asked by the letter), and their
+     * place in the list ([offset]) is not known yet; null once it is (NixieServerList.place).
+     */
+    val anchor: Char? = null,
+    /**
+     * Nixie (TV-S13): rows start at the titles whose place is this much more than a multiple of the grid's columns, so a
+     * jump's letter starts a row; the list's first row then holds this many titles (0: rows from the top).
+     */
+    val rowPhase: Int = 0,
 ) {
     /** The music videos tab shows folders instead of the paged grid. */
     val inFolders: Boolean get() = query.scope == LibraryScope.MusicVideos && musicVideoView == MusicVideoView.Folders
 
-    val scopes: List<LibraryScope> get() = LibraryQuery.scopes(
+    // Nixie (tv-home-two-rows): the Collections page has no other tab.
+    val scopes: List<LibraryScope> get() = NixieCollectionsPage.scopes(query) ?: LibraryQuery.scopes(
         query.kind,
         inGenre = query.genreId != null,
         musicVideos = musicVideos,
@@ -113,11 +136,14 @@ class LibraryViewModel @Inject constructor(
     /** Opened from the navigation bar, not for one library or genre from another page. */
     val inNavBar: Boolean get() = route.libraryId == null && route.genreId == null
 
+    /** Nixie (tv-fix-b): opened by the top bar's entry, a starred library's too (LibraryRoute.fromBar). */
+    val nixieFromBar: Boolean get() = route.fromBar
+
     private val kind = LibraryKind.valueOf(route.kind)
 
     /** Where the user left this library last time (the bar starts it anew); only for the bar's own libraries. */
     private val remembered: LibraryMemory? = memory.library(kind)?.takeIf {
-        inNavBar && it.scope in LibraryQuery.scopes(kind, inGenre = false, musicVideos = true)
+        inNavBar && !route.collections && it.scope in LibraryQuery.scopes(kind, inGenre = false, musicVideos = true)
     }
 
     /** The title that had the focus then, for the grid to go back to. */
@@ -125,7 +151,8 @@ class LibraryViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(
         LibraryState(
-            query = LibraryQuery(
+            // Nixie (tv-home-two-rows): the Collections page's own query.
+            query = NixieCollectionsPage.query(route.collections) ?: LibraryQuery(
                 kind = kind,
                 libraryId = route.libraryId?.let(UUID::fromString),
                 genreId = route.genreId?.let(UUID::fromString),
@@ -158,8 +185,22 @@ class LibraryViewModel @Inject constructor(
     )
 
     private var loadJob: Job? = null
-    private var lettersJob: Job? = null
+
+    // Nixie (TV-S1): the A–Z rail's letters (NixieRailLetters), in place of Glacier's letters job.
+    private val railLetters = NixieRailLetters(viewModelScope, repository, { _state.value }) { query, letters ->
+        _state.update { if (it.query == query) it.copy(letters = letters) else it }
+    }
     private var refreshJob: Job? = null
+
+    // Nixie (TV-S1): the A–Z jump under way (a newer letter cancels it); the index it waits for is the rail's
+    // (NixieRailLetters.awaitIndex).
+    private var jumpJob: Job? = null
+
+    // Nixie (TV-S1): a list from the server is counted after its first page, and jumps by the server's offset.
+    private val serverList = NixieServerList(viewModelScope, repository, _state, PAGE_SIZE)
+
+    /** Nixie (TV-S1): the first page, the first row and the A–Z jumps, timed for the detailed log. */
+    private val timings = NixieLibraryTimings(viewModelScope)
 
     init {
         // The kept sort and toggles come from the settings file, which may not be read yet right after start.
@@ -168,7 +209,7 @@ class LibraryViewModel @Inject constructor(
                 .onFailure { Log.w(TAG, "Reading the library sort failed", it) }
                 .getOrNull()
             if (current != null) {
-                val filters = current.libraryFilters[kind.name]
+                val filters = current.libraryFilters[route.nixieFilterKey] // Nixie (tv-home-two-rows): its own
                 _state.update {
                     it.copy(
                         query = it.query.withKeptSort(current.librarySorts).copy(
@@ -208,17 +249,19 @@ class LibraryViewModel @Inject constructor(
      */
     private fun refresh() {
         val current = _state.value
-        if (current.items.isEmpty() || loadJob?.isActive == true) return
+        // Nixie (TV-S13): a jump's page whose place is not known yet is not asked again in place.
+        if (current.items.isEmpty() || loadJob?.isActive == true || current.anchor != null) return
         val query = current.query
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
             try {
-                val page = repository.page(query, start = current.offset, limit = current.items.size)
+                // Nixie (TV-S1): a list in the server's order is asked again in that order, with its size.
+                val page = with(current) { repository.page(query, offset, items.size, serverOrder, total, false) }
                 _state.update {
                     if (it.query == query && it.offset == current.offset &&
                         loadJob?.isActive != true
                     ) {
-                        it.copy(items = page.items, total = page.total)
+                        it.copy(items = page.items, total = page.total ?: it.total)
                     } else {
                         it
                     }
@@ -240,7 +283,8 @@ class LibraryViewModel @Inject constructor(
 
     /** Back to the toolbar: a list that starts further down (after a jump) starts at the top again. */
     fun toStart() {
-        if (_state.value.offset > 0) reload()
+        // Nixie (TV-S13): also a jump's page whose place is not known yet, or rows that start at a jump's letter.
+        if (_state.value.let { it.offset > 0 || it.anchor != null || it.rowPhase != 0 }) reload()
     }
 
     /** Called by the grid of [columns] when it gets near the start of what is loaded, after a jump: the titles before it. */
@@ -252,13 +296,20 @@ class LibraryViewModel @Inject constructor(
             _state.update { it.copy(loading = true) }
             try {
                 // From the start of a row, so the rows already there stay as they are.
-                val start = repository.rowStart(query, (current.offset - PAGE_SIZE).coerceAtLeast(0), columns)
-                val page = repository.page(query, start = start, limit = current.offset - start)
+                // Nixie (TV-S1): in the server's order too (after a jump by offset).
+                val start = serverList.rowStartBefore(current, PAGE_SIZE, columns)
+                val page = with(current) { repository.page(query, start, offset - start, serverOrder, total, false) }
                 _state.update {
                     if (it.query != query || it.offset != current.offset) {
                         it.copy(loading = false)
                     } else {
-                        it.copy(items = page.items + it.items, offset = start, total = page.total, loading = false)
+                        // Nixie (TV-S1): each title once (the grid's keys).
+                        it.copy(
+                            items = NixieLibraryPaging.appended(page.items, it.items),
+                            offset = start,
+                            total = page.total ?: it.total,
+                            loading = false,
+                        )
                     }
                 }
             } catch (e: CancellationException) {
@@ -299,7 +350,7 @@ class LibraryViewModel @Inject constructor(
             runSuspendCatching {
                 settings.update {
                     it.copy(
-                        libraryFilters = it.libraryFilters + (kind.name to choice),
+                        libraryFilters = it.libraryFilters + (route.nixieFilterKey to choice), // Nixie
                     )
                 }
             }
@@ -370,15 +421,39 @@ class LibraryViewModel @Inject constructor(
      */
     fun jumpToLetter(letter: Char, columns: Int) {
         val current = _state.value
-        if (current.total == null) return
-        viewModelScope.launch {
+        // Nixie (TV-S1): a list from the server is uncounted until its count comes; it jumps by offset meanwhile.
+        if (current.total == null && !(current.serverOrder && current.items.isNotEmpty())) return
+        // Nixie (TV-S1): only the latest letter wins: a jump still waiting for the index gives way to a newer one.
+        jumpJob?.cancel()
+        val pressed = timings.mark() // Nixie (TV-S1)
+        jumpJob = viewModelScope.launch {
+            // Nixie (TV-S1): a list in the server's order whose index is not in memory jumps by the server's offset:
+            // two small requests, no whole-library work between the press and the grid (DESIGN-RULES 3).
+            // Nixie (TV-S13): one request before the first row, the letter's own page; its place comes after it.
+            if (serverList.jumpsByOffset(current)) {
+                val how = serverList.jump(letter, columns, { loadFrom(it, fromServer = true) }, ::asLoad) {
+                    loadBefore(columns)
+                } ?: return@launch
+                return@launch timings.jumped(pressed, how)
+            }
+            railLetters.awaitIndex(current.query) // Nixie (TV-S1)
             val index = runSuspendCatching { repository.indexOfLetter(current.query, letter) }
                 .onFailure { Log.w(TAG, "A-Z jump failed", it) }
                 .getOrNull() ?: return@launch
+            railLetters.afterJump(current.query) // Nixie (TV-S1)
             if (!loadAround(index, columns)) return@launch
-            _state.update { it.copy(jumpTo = (index - it.offset).coerceIn(0, (it.items.size - 1).coerceAtLeast(0))) }
+            scrollTo(index)
+            timings.jumped(pressed, "the index") // Nixie (TV-S1)
         }
     }
+
+    /** The grid scrolls to position [index] of the list (a jump's landing). */
+    private fun scrollTo(index: Int) = _state.update {
+        it.copy(jumpTo = (index - it.offset).coerceIn(0, (it.items.size - 1).coerceAtLeast(0)))
+    }
+
+    /** Nixie (TV-S1): the grid drew the first row of the list, for the detailed log's timing. */
+    fun firstRowShown() = timings.firstRowShown()
 
     /**
      * Loads the title [id] when it is further down than what is loaded, as an A–Z jump would;
@@ -388,6 +463,8 @@ class LibraryViewModel @Inject constructor(
         val current = _state.value
         if (current.items.any { it.id.toString() == id }) return true
         val uuid = runCatching { UUID.fromString(id) }.getOrNull() ?: return false
+        // Nixie (TV-S1): a list in the server's order does not wait for the whole index to find a title further down.
+        if (serverList.withoutIndex(current)) return false
         return viewModelScope.async {
             val index = runSuspendCatching { repository.indexOf(current.query, uuid) }.getOrNull() ?: return@async false
             loadAround(index, columns) && _state.value.items.any { it.id == uuid }
@@ -398,48 +475,35 @@ class LibraryViewModel @Inject constructor(
     private suspend fun loadAround(index: Int, columns: Int): Boolean {
         val state = _state.value
         val end = state.offset + state.items.size
-        if (index >= state.offset && index < end + PAGE_SIZE) {
+        // Nixie (TV-S1): a list in the server's order starts anew in the app's, where the index puts the title.
+        if (!state.serverOrder && index >= state.offset && index < end + PAGE_SIZE) {
             loadUpTo(index + PAGE_SIZE / 2)?.join()
             return true
         }
-        val start = runSuspendCatching {
-            repository.rowStart(
-                state.query,
-                (index - JUMP_ROWS_BEFORE * columns).coerceAtLeast(0),
-                columns,
-            )
-        }
-            .getOrElse { return false }
-        loadJob?.cancel()
-        refreshJob?.cancel()
-        val query = state.query
-        loadJob = viewModelScope.launch {
-            _state.update { it.copy(loading = true, failed = false) }
-            try {
-                val page = repository.page(query, start = start, limit = PAGE_SIZE)
-                _state.update {
-                    if (it.query == query) {
-                        it.copy(
-                            items = page.items,
-                            offset = start,
-                            total = page.total,
-                            loading = false,
-                        )
-                    } else {
-                        it
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "Loading library failed", e)
-                _state.update { it.copy(loading = false, failed = true) }
-            }
-        }.also { it.join() }
-        return true
+        val first = (index - JUMP_ROWS_BEFORE * columns).coerceAtLeast(0)
+        val start = runSuspendCatching { repository.rowStart(state.query, first, columns) }.getOrElse { return false }
+        return loadFrom(start)
     }
 
-    fun jumpHandled() = _state.update { it.copy(jumpTo = null) }
+    /**
+     * Nixie (TV-S1): the list starts anew at [start] (a jump's place); [fromServer], from the server in its order (a jump
+     * by the server's offset), with no overlap; false when the page did not come. TV-S13: NixieServerList's, as the load.
+     */
+    private suspend fun loadFrom(start: Int, fromServer: Boolean = false): Boolean {
+        var loaded = false
+        asLoad { loaded = serverList.loadFrom(start, fromServer) }
+        return loaded
+    }
+
+    /** Nixie (TV-S13): [block] as the list's load, which a newer load or a new list cancels. */
+    private suspend fun asLoad(block: suspend () -> Unit) {
+        loadJob?.cancel()
+        refreshJob?.cancel()
+        viewModelScope.launch { block() }.also { loadJob = it }.join()
+    }
+
+    // Nixie (TV-S13): the jump on screen, for the line from the key.
+    fun jumpHandled() = _state.update { it.copy(jumpTo = null) }.also { timings.jumpShown() }
 
     fun open(item: MediaItem) {
         val query = _state.value.query
@@ -565,7 +629,7 @@ class LibraryViewModel @Inject constructor(
     fun onNav(target: NavTarget) {
         val event = sessions.navEvent(
             target,
-            current = NavTarget.Library(_state.value.query.kind).takeIf { inNavBar },
+            current = NixieCollectionsPage.navTarget(route.collections, kind).takeIf { inNavBar }, // Nixie
         ) ?: return
         viewModelScope.launch { _events.send(event) }
     }
@@ -581,13 +645,19 @@ class LibraryViewModel @Inject constructor(
     fun focused(id: String) = remember(focusId = id)
 
     private fun remember(focusId: String?) {
-        if (!inNavBar) return
+        if (!inNavBar || route.collections) return // Nixie (tv-home-two-rows): never the movies' memory
         val query = _state.value.query
         memory.remember(kind, LibraryMemory(query.scope, focusId, _state.value.folderPath))
     }
 
     private fun reload() {
+        timings.opened() // Nixie (TV-S1)
         loadJob?.cancel()
+        // Nixie (TV-S1): a sort or filter change also drops the old list's refresh, jump and index; its letters below.
+        refreshJob?.cancel()
+        jumpJob?.cancel()
+        serverList.cancel()
+        railLetters.reset()
         _state.update {
             it.copy(
                 items = emptyList(),
@@ -597,6 +667,9 @@ class LibraryViewModel @Inject constructor(
                 failed = false,
                 letters = emptySet(),
                 jumpTo = null,
+                serverOrder = false, // Nixie (TV-S1)
+                anchor = null, // Nixie (TV-S13)
+                rowPhase = 0,
             )
         }
         val current = _state.value
@@ -605,23 +678,10 @@ class LibraryViewModel @Inject constructor(
             if (current.inFolders) return loadFolder()
         }
         loadUpTo(PAGE_SIZE - 1)
-        lettersJob?.cancel()
-        val query = _state.value.query
-        if (query.railed) {
-            lettersJob = viewModelScope.launch {
-                runSuspendCatching { repository.availableLetters(query) }
-                    .onSuccess { letters ->
-                        _state.update {
-                            if (it.query == query) {
-                                it.copy(letters = letters)
-                            } else {
-                                it
-                            }
-                        }
-                    }
-                    .onFailure { Log.w(TAG, "Loading A-Z letters failed", it) }
-            }
-        }
+        // Nixie (TV-S1): after the first screen (DESIGN-RULES 1): the count, and the rail's letters from memory or the
+        // device (a saved index of 25,000 films is seconds of work on a TV), never an index from the server on open.
+        serverList.countAfter(timings.firstScreen)
+        railLetters.open(_state.value.query, timings.firstScreen)
     }
 
     /**
@@ -702,10 +762,33 @@ class LibraryViewModel @Inject constructor(
                     val state = _state.value
                     val end = state.offset + state.items.size
                     if ((state.total != null && end >= state.total) || end > index) break
-                    val page = repository.page(query, start = end, limit = PAGE_SIZE)
-                    if (_state.value.query != query || _state.value.offset != state.offset) return@launch
-                    _state.update { it.copy(items = it.items + page.items, total = page.total) }
-                    if (page.items.isEmpty()) break
+                    // Nixie (TV-S1): the first page may come straight from the server; the next ones then follow it.
+                    val page = if (end == 0) {
+                        // Nixie (TV-S1): timed. Nixie (tv-home-two-rows): the Collections page's first screen only.
+                        timings.firstPage { repository.firstPage(query, limit = query.nixieFirstPage) }
+                    } else {
+                        // Nixie (TV-S13): a jump's page whose place is not known yet goes on from its letter.
+                        serverList.nextFromLetter(state) ?: repository.page(
+                            query,
+                            start = end,
+                            limit = PAGE_SIZE,
+                            serverOrder = state.serverOrder,
+                            total = state.total,
+                        )
+                    }
+                    // Nixie (TV-S13): the same list, though a jump's page may have learned its place meanwhile.
+                    if (!serverList.sameList(state, _state.value)) return@launch
+                    // Nixie (TV-S1): each title once, though the server's list moved between pages (the grid's keys).
+                    val before = _state.value.items.size
+                    _state.update {
+                        it.copy(
+                            items = NixieLibraryPaging.appended(it.items, page.items),
+                            total = page.total ?: it.total,
+                            serverOrder = page.serverOrder,
+                        )
+                    }
+                    if (page.items.isEmpty() || _state.value.items.size == before) break
+                    railLetters.whenScrolledFar() // Nixie (TV-S1)
                 }
                 _state.update { it.copy(loading = false) }
             } catch (e: CancellationException) {

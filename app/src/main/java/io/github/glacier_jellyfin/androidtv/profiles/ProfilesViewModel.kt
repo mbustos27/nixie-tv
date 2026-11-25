@@ -29,6 +29,8 @@ import io.github.glacier_jellyfin.androidtv.navigation.SignInRoute
 import io.github.glacier_jellyfin.androidtv.setup.ServerConnector
 import io.github.glacier_jellyfin.androidtv.setup.ServerReachability
 import io.github.glacier_jellyfin.androidtv.ui.UiEvent
+import io.github.mbustos27.nixie.tv.start.StartFromSaved
+import io.github.mbustos27.nixie.tv.start.StartMemory
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -71,6 +73,9 @@ class ProfilesViewModel @Inject constructor(
     private val reachability: ServerReachability,
     private val finder: ServerFinder,
     private val connector: ServerConnector,
+    // Nixie (tv-home-start): an app start opens the start profile from what is saved; the server is asked after.
+    private val nixieStart: StartFromSaved,
+    private val nixieMemory: StartMemory,
 ) : ViewModel() {
 
     private val route = savedStateHandle.toRoute<ProfilesRoute>()
@@ -89,6 +94,11 @@ class ProfilesViewModel @Inject constructor(
             val server = accounts.current().servers.firstOrNull { it.id == serverId }
             if (server == null) {
                 _events.send(UiEvent.Navigate(ServerListRoute, clearBackStack = true))
+                return@launch
+            }
+            // Nixie (tv-home-start): from what is saved, with no request (StartFromSaved).
+            if (route.appStart && nixieStart.open(serverId, route.userId)) {
+                _events.send(UiEvent.Navigate(HomeRoute, clearBackStack = true))
                 return@launch
             }
             // Another server answering here was set up again: its profiles continue under its new id.
@@ -148,6 +158,10 @@ class ProfilesViewModel @Inject constructor(
         val state = accounts.current()
         val profiles = state.profilesFor(serverId, publicUsers)
         val choice = route.userId?.let { profileChoice(it, profiles) } ?: state.startChoice(serverId, profiles)
+        // Nixie (tv-home-start): what "the single profile" decided with the server's list, for the next start.
+        if (route.userId == null && publicUsers != null && state.startProfile.mode == StartMode.Single) {
+            nixieMemory.rememberSingle(serverId, (choice as? StartChoice.Open)?.userId)
+        }
         when (choice) {
             StartChoice.Pick -> Unit
 
@@ -202,11 +216,15 @@ class ProfilesViewModel @Inject constructor(
     /** Returns true when this screen is left: the profile opened (and Home is on its way), or the server did not answer. */
     private suspend fun open(profile: Profile): Boolean {
         val server = _state.value.server ?: return false
-        val token = accounts.current().users.firstOrNull {
+        val stored = accounts.current().users.firstOrNull {
             it.serverId == serverId && it.userId == profile.userId
-        }?.accessToken
+        }
+        val token = stored?.accessToken
         // A revoked token sends the user to sign-in, an unreachable server to the server list.
-        val check = token?.let { runSuspendCatching { authenticator.isTokenValid(server.address, it) } }
+        // Nixie: asked as the profile's own device id (DeviceIds).
+        val check = token?.let {
+            runSuspendCatching { authenticator.isTokenValid(server.address, it, stored.deviceId) }
+        }
         if (check?.isFailure == true) {
             leaveUnreachable()
             return true
