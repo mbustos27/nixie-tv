@@ -111,9 +111,9 @@ import io.github.glacier_jellyfin.androidtv.ui.UiEvent
 import io.github.glacier_jellyfin.androidtv.ui.ageRatingText
 import io.github.glacier_jellyfin.androidtv.ui.runtimeText
 import io.github.glacier_jellyfin.androidtv.ui.yearText
+import io.github.mbustos27.nixie.tv.play.rememberEndsAtClock
 import io.github.mbustos27.nixie.tv.trailer.TrailerWarmup
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
 /** The OSD hides after this long without input while playing (Nixie, TV-S3: the movie player's 3 s; Glacier: 5 s). */
@@ -529,8 +529,12 @@ private fun TrailerOsd(
                     Text(rating, style = GlacierText.body(17), color = GlacierColors.Ice)
                 }
             }
-            // Nixie (TV-S3): the movie player's clock.
-            Text(LocalTime.now().format(ClockFormat), style = GlacierText.display(34), color = GlacierColors.Ice)
+            // Nixie (TV-S3): the movie player's clock; tv-1.0.1: in the TV's 12- or 24-hour setting, as there.
+            Text(
+                LocalTime.now().format(rememberEndsAtClock()),
+                style = GlacierText.display(34),
+                color = GlacierColors.Ice,
+            )
         }
 
         // Nixie (TV-S3): the movie player's bottom block (padding and gaps), seek bar and times.
@@ -1075,5 +1079,3 @@ private fun TitleAction.label(): Int = when (this) {
 
 private fun fraction(progress: TrailerProgress): Float =
     if (progress.durationMs > 0) (progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f) else 0f
-
-private val ClockFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")

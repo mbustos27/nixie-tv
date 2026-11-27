@@ -484,4 +484,5 @@ gate's `RefusedTranscodeGate` on the TV's fake Jellyfin (`tvserver.py --refuse-t
 | `app/.../ui/Toast.kt` | A toast stays by its length, 2.2 to 6.5 s | The notice is two sentences |
 | `app/.../settings/SettingsScreen.kt` | About: "Install on another TV" (`InstallLink`), not in a store's build | The release's short link in the app |
 | `app/.../player/PlayerOsd.kt`, `app/.../detail/DetailScreen.kt` | "Ends at" and the player's clock through `rememberEndsAtClock()`: the TV's 12- or 24-hour setting | They were always 24-hour |
+| `app/.../trailer/TrailerScreen.kt` | The trailer's clock through `rememberEndsAtClock()` too | It shares the player's place |
 | `app/detekt-baseline.xml` | `lowerQuality`'s old condition dropped: it moved to `nothingToLower` | |
