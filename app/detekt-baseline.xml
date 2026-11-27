@@ -12,7 +12,6 @@
     <ID>ComplexCondition:LiveTvScreen.kt:watchedKey != null &amp;&amp; fresh &amp;&amp; state.favoritesOnly &amp;&amp; shown.none { it.id.toString() == watchedKey } &amp;&amp; state.listed?.any { it.id.toString() == watchedKey } == true</ID>
     <ID>ComplexCondition:MusicPlayerScreen.kt:waiting || state.failed || sheet != null || infoOpen</ID>
     <ID>ComplexCondition:PlayerScreen.kt:osdVisible &amp;&amp; state.playing &amp;&amp; scrubMs == null &amp;&amp; !overlayOpen</ID>
-    <ID>ComplexCondition:PlayerViewModel.kt:PlayerViewModel$current.ladder != null || current.live || streamBitrate == null || qualitySteps &gt;= MAX_QUALITY_STEPS || streamBitrate &lt;= StreamBudget.FLOOR || settings.settings.value.playback.maxBitrate != MaxBitrate.Auto</ID>
     <ID>ComplexCondition:PlayerViewModel.kt:PlayerViewModel$playback != null &amp;&amp; started &amp;&amp; player.isPlaying &amp;&amp; now - playingSinceMs &gt; THROUGHPUT_SETTLE_MS &amp;&amp; now - lastSeekMs &gt; THROUGHPUT_SETTLE_MS</ID>
     <ID>ComplexCondition:PlayerViewModel.kt:PlayerViewModel.&lt;no name provided&gt;$controller != null &amp;&amp; player != null &amp;&amp; error.errorCode in LINK_ERRORS &amp;&amp; linkRetries &lt; MAX_LINK_RETRIES</ID>
     <ID>ComplexCondition:PlayerViewModel.kt:PlayerViewModel.&lt;no name provided&gt;$current != null &amp;&amp; current.fmp4Segments &amp;&amp; segments == null &amp;&amp; error.errorCode in FMP4_ERRORS</ID>

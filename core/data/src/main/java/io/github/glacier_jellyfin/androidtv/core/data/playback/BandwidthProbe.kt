@@ -55,8 +55,7 @@ internal object BandwidthProbe {
      * headroom): a low first reading is measured again before it may hold a stream back, since it is mostly the
      * connection warming up or the wait for the server's answer.
      */
-    fun needsSecond(firstBps: Double): Boolean =
-        firstBps * StreamBudget.HEADROOM_PERCENT / 100 < StreamBudget.CEILING
+    fun needsSecond(firstBps: Double): Boolean = firstBps * StreamBudget.HEADROOM_PERCENT / 100 < StreamBudget.CEILING
 
     /** The speed of [bytes] moved in [nanos], in bit/s. */
     fun bitsPerSecond(bytes: Long, nanos: Long): Double {

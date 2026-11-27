@@ -115,9 +115,8 @@ class RefusedSmallerStreamTest {
         val server = FakePlaybackServer(film4k) { _, choice ->
             choice is Choice.EncodeVideo && (choice.maxWidth ?: Int.MAX_VALUE) < 3840
         }
-        val source = runBlocking {
-            server.repository(device.copy(hdr = emptySet()), FULL_HD, FULL_HD).open(FakePlaybackServer.ITEM, 0, null, null)
-        }
+        val repository = server.repository(device.copy(hdr = emptySet()), FULL_HD, FULL_HD)
+        val source = open(repository)
 
         assertEquals(PlaybackMethod.Transcode, source.method)
         assertTrue("choices ${server.choices}", server.choices.last() is Choice.Refused)

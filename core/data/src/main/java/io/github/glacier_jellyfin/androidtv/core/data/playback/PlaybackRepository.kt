@@ -443,7 +443,11 @@ class PlaybackRepository @Inject constructor(
      * a slow link that does not finish within [BandwidthProbe.TIMEOUT_MS] still gives the speed it showed.
      * Nixie (tv-1.0.1): timed from the first byte (see [BandwidthProbe.reading]); [maxSteadyMs] ends it that long after it.
      */
-    private suspend fun downloadBps(session: Session, blockBytes: Int, maxSteadyMs: Long? = null): Double? {
+    private suspend fun downloadBps(
+        session: Session,
+        blockBytes: Int,
+        maxSteadyMs: Long? = null,
+    ): Double? {
         val started = System.nanoTime()
         var deadline = started + BandwidthProbe.TIMEOUT_MS * 1_000_000
         var received = 0L
@@ -871,16 +875,9 @@ class PlaybackRepository @Inject constructor(
                 ) {
                     return false
                 }
-                val streams = first.mediaStreams.orEmpty()
                 // Only the subtitle that shows counts: a burned-in one needs a new picture.
-                val subtitle = (subtitleIndex ?: first.defaultSubtitleStreamIndex)?.takeIf { it >= 0 }
-                if (streams.any {
-                        it.type == MediaStreamType.SUBTITLE && it.index == subtitle &&
-                            it.deliveryMethod == SubtitleDeliveryMethod.ENCODE
-                    }
-                ) {
-                    return false
-                }
+                if (burnedIn(first)) return false
+                val streams = first.mediaStreams.orEmpty()
                 val videoBitrate = streams.firstOrNull { it.type == MediaStreamType.VIDEO }?.bitRate ?: return false
                 val audio = streams.firstOrNull {
                     it.type == MediaStreamType.AUDIO &&
@@ -963,7 +960,10 @@ class PlaybackRepository @Inject constructor(
                         // not asked again; one that refuses now leaves the file as it was (see askAgain).
                         if (fileFits && refusedBefore()) {
                             smallerRefused = true
-                            Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
+                            Log.i(
+                                TAG,
+                                "The server refused a smaller stream for this profile earlier: playing the original",
+                            )
                         } else if (!keepPicture(first, first.bitrate!!, budget) && !askAgain(budget) && fileFits) {
                             keptFile("The server refused a stream that fits the link")
                         }

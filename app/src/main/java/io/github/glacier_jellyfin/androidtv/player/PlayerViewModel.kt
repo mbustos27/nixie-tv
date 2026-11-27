@@ -1509,6 +1509,17 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
+     * Nothing smaller can take over from [current], which asks [streamBitrate] of the link. Tiers follow the link by
+     * themselves; Live TV has no bitrate to lower. Only "Auto" decides by itself; a chosen cap stays.
+     * Nixie (tv-1.0.1): nor a file whose server refused anything smaller (PlaybackSource.smallerRefused).
+     */
+    private fun nothingToLower(current: PlaybackSource, streamBitrate: Int): Boolean {
+        if (current.ladder != null || current.live || current.smallerRefused) return true
+        return qualitySteps >= MAX_QUALITY_STEPS || streamBitrate <= StreamBudget.FLOOR ||
+            settings.settings.value.playback.maxBitrate != MaxBitrate.Auto
+    }
+
+    /**
      * A stream that asks less of the link takes over: handed over in the playing player when its buffer carries the new
      * stream's start (see [HandoverPlanner]), else the title is opened again at the current position. Not while a hand over
      * is on its way. False when there is nothing to lower; true when it is handled, also when it waits for a better moment.
@@ -1517,16 +1528,8 @@ class PlayerViewModel @Inject constructor(
         if (handoverActive) return true
         stallWatch?.cancel()
         val current = source ?: return false
-        val streamBitrate = current.streamBitrate
-        // Only "Auto" decides by itself; a chosen cap stays. Live TV has no bitrate to lower.
-        // Tiers follow the link by themselves; a new stream is for the one that cannot.
-        // Nixie (tv-1.0.1): nor a file whose server refused anything smaller (PlaybackSource.smallerRefused).
-        if (current.ladder != null || current.live || streamBitrate == null || qualitySteps >= MAX_QUALITY_STEPS ||
-            streamBitrate <= StreamBudget.FLOOR || settings.settings.value.playback.maxBitrate != MaxBitrate.Auto ||
-            current.smallerRefused
-        ) {
-            return false
-        }
+        val streamBitrate = current.streamBitrate ?: return false
+        if (nothingToLower(current, streamBitrate)) return false
         val player = _state.value.player
         val canHand = player != null && started && _state.value.playback?.canHandOver == true
         val plan = if (canHand) {

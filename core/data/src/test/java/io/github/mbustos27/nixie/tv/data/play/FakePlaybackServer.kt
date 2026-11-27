@@ -165,16 +165,7 @@ internal class FakePlaybackServer(
     private fun answer(dto: PlaybackInfoDto): String {
         asked += dto
         val profile = checkNotNull(dto.deviceProfile) { "PlaybackInfo without a device profile" }
-        val video = buildList {
-            val direct = profile.directPlayProfiles.any {
-                it.type == DlnaProfileType.VIDEO && title.container in it.container.split(',') &&
-                    title.videoCodec in it.videoCodec.orEmpty().split(',')
-            }
-            if (!direct) add("VideoCodecNotSupported")
-            profile.applying(CodecType.VIDEO, title.videoCodec).filterNot(::holds).forEach { add(reason(it.property)) }
-            // Against the file's bitrate, as Jellyfin does (Nixie tv-1.0.1: it was the picture's alone).
-            if ((dto.maxStreamingBitrate ?: Int.MAX_VALUE) < title.bitrate) add("ContainerBitrateExceedsLimit")
-        }.distinct()
+        val video = videoReasons(profile, dto.maxStreamingBitrate)
         val audio = buildList {
             val direct = profile.directPlayProfiles.any {
                 it.type == DlnaProfileType.VIDEO && title.audioCodec in it.audioCodec.orEmpty().split(',')
@@ -200,6 +191,18 @@ internal class FakePlaybackServer(
         choices += choice
         return playbackInfo(choice)
     }
+
+    /** Why the picture can't play as it is with [profile] and a limit of [maxBitrate]; empty when it can. */
+    private fun videoReasons(profile: DeviceProfile, maxBitrate: Int?): List<String> = buildList {
+        val direct = profile.directPlayProfiles.any {
+            it.type == DlnaProfileType.VIDEO && title.container in it.container.split(',') &&
+                title.videoCodec in it.videoCodec.orEmpty().split(',')
+        }
+        if (!direct) add("VideoCodecNotSupported")
+        profile.applying(CodecType.VIDEO, title.videoCodec).filterNot(::holds).forEach { add(reason(it.property)) }
+        // Against the file's bitrate, as Jellyfin does (Nixie tv-1.0.1: it was the picture's alone).
+        if ((maxBitrate ?: Int.MAX_VALUE) < title.bitrate) add("ContainerBitrateExceedsLimit")
+    }.distinct()
 
     /** The conditions of the codec profiles of [type] for [codec] whose apply-conditions hold. */
     private fun DeviceProfile.applying(type: CodecType, codec: String): List<ProfileCondition> = codecProfiles

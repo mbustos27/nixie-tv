@@ -70,8 +70,10 @@ internal class FakeLink(
 
     private fun OutputStream.head(status: String, length: Int) {
         write(
-            ("HTTP/1.1 $status\r\nContent-Type: application/octet-stream\r\nContent-Length: $length\r\n" +
-                "Connection: close\r\n\r\n").toByteArray(Charsets.ISO_8859_1),
+            (
+                "HTTP/1.1 $status\r\nContent-Type: application/octet-stream\r\nContent-Length: $length\r\n" +
+                    "Connection: close\r\n\r\n"
+                ).toByteArray(Charsets.ISO_8859_1),
         )
         flush()
     }

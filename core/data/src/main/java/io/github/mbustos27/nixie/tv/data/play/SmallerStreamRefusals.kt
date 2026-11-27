@@ -25,7 +25,8 @@ data class RefusedSmaller(val at: Long, val signIn: String)
  */
 class SmallerStreamRefusals(
     private val read: suspend () -> Map<String, RefusedSmaller>,
-    private val write: suspend ((Map<String, RefusedSmaller>) -> Map<String, RefusedSmaller>) -> Unit,
+    private val write:
+    suspend ((Map<String, RefusedSmaller>) -> Map<String, RefusedSmaller>) -> Unit,
 ) {
     /** Now, in epoch ms; tests move it on. */
     internal var clock: () -> Long = System::currentTimeMillis
@@ -37,7 +38,11 @@ class SmallerStreamRefusals(
     private var loaded = false
 
     /** True when [serverId] refused a smaller stream for [userId], signed in as [signIn], within [TTL_MS]. */
-    suspend fun refused(serverId: String, userId: String, signIn: String): Boolean {
+    suspend fun refused(
+        serverId: String,
+        userId: String,
+        signIn: String,
+    ): Boolean {
         load()
         val key = key(serverId, userId)
         val entry = known[key] ?: return false
@@ -47,7 +52,11 @@ class SmallerStreamRefusals(
         return false
     }
 
-    suspend fun remember(serverId: String, userId: String, signIn: String) {
+    suspend fun remember(
+        serverId: String,
+        userId: String,
+        signIn: String,
+    ) {
         load()
         val key = key(serverId, userId)
         val entry = RefusedSmaller(clock(), signIn)

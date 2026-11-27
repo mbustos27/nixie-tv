@@ -30,7 +30,8 @@ data class SettingsState(
     val restoreOffered: Set<String> = emptySet(),
     // Nixie (tv-1.0.1): the profiles whose server refused a smaller stream (SmallerStreamRefusals), by profileKey; this
     // device's alone, so never in a profile's settings, which go to the server as a copy.
-    val nixieRefusedSmaller: Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller> = emptyMap(),
+    val nixieRefusedSmaller: Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller> =
+        emptyMap(),
 )
 
 internal fun profileKey(serverId: String, userId: String) = "$serverId/$userId"

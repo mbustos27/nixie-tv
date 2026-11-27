@@ -55,7 +55,12 @@ class BandwidthProbeTest {
     @Test
     fun `a download with too little after its first read is timed as a whole`() {
         // One read of 8 KiB and almost nothing after it says nothing about the speed after it.
-        val reading = BandwidthProbe.reading(bytes = 9_000, nanos = 1_000_000_000, steadyBytes = 808, steadyNanos = 1_000)
+        val reading = BandwidthProbe.reading(
+            bytes = 9_000,
+            nanos = 1_000_000_000,
+            steadyBytes = 808,
+            steadyNanos = 1_000,
+        )
         assertEquals(72_000.0, reading, 0.5)
     }
 
