@@ -68,6 +68,7 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.LocalAccent
 import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.ui.seasonLabel
 import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
+import io.github.mbustos27.nixie.tv.play.rememberEndsAtClock
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -207,7 +208,7 @@ fun PlayerOsd(
                     val end = now.plusSeconds((progress.durationMs - progress.positionMs).coerceAtLeast(0) / 1000)
                     Text(
                         // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock.
-                        stringResource(R.string.player_ends_at, end.format(io.github.mbustos27.nixie.tv.play.rememberEndsAtClock())),
+                        stringResource(R.string.player_ends_at, end.format(rememberEndsAtClock())),
                         style = GlacierText.body(18),
                         color = OsdSecondary,
                     )
@@ -249,7 +250,7 @@ private fun TitleBlock(state: PlayerUiState, modifier: Modifier) {
 @Composable
 private fun Clock(now: LocalTime, modifier: Modifier) {
     // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock, like "Ends at" beside it.
-    val clock = io.github.mbustos27.nixie.tv.play.rememberEndsAtClock()
+    val clock = rememberEndsAtClock()
     Text(now.format(clock), modifier, style = GlacierText.display(34), color = GlacierColors.Ice)
 }
 

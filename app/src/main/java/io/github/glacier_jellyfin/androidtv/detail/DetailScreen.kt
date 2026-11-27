@@ -117,6 +117,7 @@ import io.github.mbustos27.nixie.tv.detail.cardReturn
 import io.github.mbustos27.nixie.tv.detail.cardReturnPage
 import io.github.mbustos27.nixie.tv.detail.rememberCardReturn
 import io.github.mbustos27.nixie.tv.play.playLabelText
+import io.github.mbustos27.nixie.tv.play.rememberEndsAtClock
 import io.github.mbustos27.nixie.tv.trailer.NixieTrailerWarmup
 import io.github.mbustos27.nixie.tv.trailer.nixieWarmTrailerOnFocus
 import io.github.mbustos27.nixie.tv.trailer.rememberReturnFocus
@@ -1043,9 +1044,10 @@ private fun endsAtText(item: MediaItem): String? {
         }
     }
     // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock.
-    val clock = io.github.mbustos27.nixie.tv.play.rememberEndsAtClock()
+    val clock = rememberEndsAtClock()
     return stringResource(R.string.detail_ends_at, now.plusMinutes(minutes.toLong()).format(clock))
 }
+
 private const val CLOCK_TICK_MS = 15_000L
 
 /** The video format only, e.g. "4K HDR". Audio languages could grow the line without bound. */
