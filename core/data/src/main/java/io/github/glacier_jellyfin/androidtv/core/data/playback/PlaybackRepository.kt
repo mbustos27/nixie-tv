@@ -22,6 +22,7 @@ import io.github.glacier_jellyfin.androidtv.core.log.DebugOptions
 import io.github.glacier_jellyfin.androidtv.core.log.DebugThrottle
 import io.github.glacier_jellyfin.androidtv.core.log.Log
 import io.github.mbustos27.nixie.tv.data.play.DisplayPanel
+import io.github.mbustos27.nixie.tv.data.play.SmallerStreamRefusals
 import io.github.mbustos27.nixie.tv.data.play.pictureOnlyCopied
 import io.github.mbustos27.nixie.tv.data.watchnext.WatchNextProgress
 import java.net.HttpURLConnection
@@ -66,6 +67,7 @@ import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.PlayMethod
+import org.jellyfin.sdk.model.api.PlaybackErrorCode
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 import org.jellyfin.sdk.model.api.PlaybackInfoResponse
 import org.jellyfin.sdk.model.api.PlaybackOrder
@@ -152,6 +154,12 @@ data class PlaybackSource(
      * source's height capped to the display), for the info panel; null for the file as it is (direct play or stream).
      */
     val pictureHeight: Int? = null,
+    /**
+     * Nixie (tv-1.0.1): the link carries less than the file, but the server refused a smaller stream (now, or within the
+     * last day for this profile, see [SmallerStreamRefusals]), so the file plays as it is. The player says so and does
+     * not try to step down: there is nothing smaller to step down to.
+     */
+    val smallerRefused: Boolean = false,
 ) {
     /** A Live TV channel: no end, no resume point. */
     val live: Boolean get() = liveStreamId != null
@@ -265,6 +273,16 @@ class PlaybackRepository @Inject constructor(
 
     /** Nixie (tv-watchnext): videos only (music has no file, Live TV no resume point). */
     private fun nixieVideo(source: PlaybackSource) = !source.live && source.file != null
+
+    /** Nixie (tv-1.0.1): the profiles whose server refused a smaller stream; forgotten at sign-out. */
+    internal val refusals = SmallerStreamRefusals(
+        read = { settings.refusedSmaller() },
+        write = { settings.updateRefusedSmaller(it) },
+    )
+
+    init {
+        sessions.onSignOut { serverId, userId -> refusals.forget(serverId, userId) }
+    }
 
     /**
      * What the server may send this device, after the [playback] settings
@@ -782,14 +800,58 @@ class PlaybackRepository @Inject constructor(
         var fileFits = false
         // Whatever goes wrong from here on, the live stream an answer opened is given back.
         var handedOn = false
+        // Nixie (tv-1.0.1): what the server answered to the last ask it refused (NoCompatibleStream: a shared server where
+        // this profile may not transcode, or one that cannot make a stream that small); null while it refused none.
+        var refusal: PlaybackErrorCode? = null
+        // Nixie (tv-1.0.1): the link (or the cap) wanted a smaller stream, the server refused it, and the file plays.
+        var smallerRefused = false
         try {
             // Each answer opens a channel's live stream once more. The answer left behind closes its own
             // after the new one is open, so the tuner is not given up in between.
-            suspend fun askAgain(bitrate: Int, fitDisplay: Boolean = false) {
+            // Nixie (tv-1.0.1): an answer that refuses what was asked (an error code, or no source) never replaces one
+            // that plays: the answer before it stays, and false says so. Every smaller ask goes through here: the link's,
+            // the cap's and the display's.
+            suspend fun askAgain(bitrate: Int, fitDisplay: Boolean = false): Boolean {
                 val unused = info
-                info = playbackInfo(bitrate, forLadder = fitDisplay)
+                val answer = playbackInfo(bitrate, forLadder = fitDisplay)
+                if (unused.playable() && !answer.playable()) {
+                    refusal = answer.errorCode ?: refusal
+                    Log.w(
+                        TAG,
+                        "The server refused the stream asked at ${StreamBudget.describe(bitrate)}" +
+                            (if (fitDisplay) " for the display" else "") +
+                            ": ${answer.errorCode ?: "no source"}; the answer before it stays",
+                    )
+                    closeLiveStreams(api, answer)
+                    return false
+                }
+                info = answer
                 limit = bitrate.takeIf { it < AUTO_BITRATE }
                 closeLiveStreams(api, unused)
+                return true
+            }
+
+            // Nixie (tv-1.0.1): the subtitle that shows is burned in by the server, so the picture is new whatever the link.
+            fun burnedIn(first: MediaSourceInfo): Boolean {
+                val subtitle = (subtitleIndex ?: first.defaultSubtitleStreamIndex)?.takeIf { it >= 0 }
+                return first.mediaStreams.orEmpty().any {
+                    it.type == MediaStreamType.SUBTITLE && it.index == subtitle &&
+                        it.deliveryMethod == SubtitleDeliveryMethod.ENCODE
+                }
+            }
+
+            // Nixie (tv-1.0.1): this profile's server refused a smaller stream within the last day.
+            suspend fun refusedBefore(): Boolean =
+                refusals.refused(session.server.id, session.user.userId, api.deviceInfo.id)
+
+            // Nixie (tv-1.0.1): a smaller ask was refused while the file plays as it is: the file stays, and a refusal
+            // the server will repeat (NoCompatibleStream) is remembered, so the next titles do not ask again.
+            suspend fun keptFile(why: String) {
+                smallerRefused = true
+                if (refusal == PlaybackErrorCode.NO_COMPATIBLE_STREAM) {
+                    refusals.remember(session.server.id, session.user.userId, api.deviceInfo.id)
+                }
+                Log.w(TAG, "$why: playing the original")
             }
 
             // The picture fits the device (the first answer allowed direct play or stream) and the link carries it: ask for
@@ -836,6 +898,10 @@ class PlaybackRepository @Inject constructor(
                 val source = answer.mediaSources.firstOrNull()
                 val url = source?.transcodingUrl
                 val asked = url?.let { VIDEO_BITRATE.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                answer.errorCode?.let {
+                    refusal = it
+                    Log.w(TAG, "The server refused converting only the audio: $it")
+                }
                 if (answer.errorCode != null || source == null || source.supportsDirectPlay || url == null ||
                     asked == null ||
                     asked < videoBitrate || "SubtitleMethod=Encode" in url
@@ -865,7 +931,15 @@ class PlaybackRepository @Inject constructor(
                 askAgain(AUTO_BITRATE)
             }
             if (cap != null && info.errorCode == null && info.mediaSources.firstOrNull()?.supportsDirectPlay == false) {
-                askAgain(cap)
+                // Nixie (tv-1.0.1): a file the server repackages stays when it refuses the cap's stream.
+                val first = info.mediaSources.first()
+                val file = first.supportsDirectStream && !burnedIn(first)
+                if (file && refusedBefore()) {
+                    smallerRefused = true
+                    Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
+                } else if (!askAgain(cap) && file) {
+                    keptFile("The server refused a stream within the bitrate setting")
+                }
             } else if (cap == null && info.errorCode == null) {
                 val first = info.mediaSources.firstOrNull()
                 // A live channel has no file bitrate worth comparing.
@@ -884,13 +958,17 @@ class PlaybackRepository @Inject constructor(
                             )}, the link carries ${StreamBudget.describe(budget)}: asking for a stream that fits",
                         )
                         // Judged on the unlimited answer, before it is replaced. A burned-in subtitle needs a new picture whatever the link.
-                        val subtitle = (subtitleIndex ?: first.defaultSubtitleStreamIndex)?.takeIf { it >= 0 }
-                        val burnedIn = first.mediaStreams.orEmpty().any {
-                            it.type == MediaStreamType.SUBTITLE && it.index == subtitle &&
-                                it.deliveryMethod == SubtitleDeliveryMethod.ENCODE
+                        fileFits = (first.supportsDirectPlay || first.supportsDirectStream) && !burnedIn(first)
+                        // Nixie (tv-1.0.1): a server that refused a smaller stream for this profile within the last day is
+                        // not asked again; one that refuses now leaves the file as it was (see askAgain).
+                        if (fileFits && refusedBefore()) {
+                            smallerRefused = true
+                            Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
+                        } else if (!keepPicture(first, first.bitrate!!, budget) && !askAgain(budget) && fileFits) {
+                            keptFile("The server refused a stream that fits the link")
                         }
-                        fileFits = (first.supportsDirectPlay || first.supportsDirectStream) && !burnedIn
-                        if (!keepPicture(first, first.bitrate!!, budget)) askAgain(budget)
+                        // The file itself plays: there is no transcode to go back from.
+                        if (smallerRefused) fileFits = false
                     }
                 }
             }
@@ -1014,7 +1092,8 @@ class PlaybackRepository @Inject constructor(
                         maxWidth = tier.width,
                         smallAudio = tier.smallAudio,
                     )
-                    val tierSource = answer.mediaSources.firstOrNull()
+                    // Nixie (tv-1.0.1): a tier the server refused (an error code) is dropped like one without an address.
+                    val tierSource = answer.mediaSources.firstOrNull()?.takeIf { answer.errorCode == null }
                     if (tierSource?.transcodingUrl == null) {
                         Log.w(
                             TAG,
@@ -1127,6 +1206,7 @@ class PlaybackRepository @Inject constructor(
                 videoCopied = copyDemand != null,
                 // Only a stream the budget reduced: the file itself (direct play) has nothing to go back to.
                 fileFitsDevice = fileFits && method != PlaybackMethod.DirectPlay,
+                smallerRefused = smallerRefused && method != PlaybackMethod.Transcode,
                 pictureHeight = when {
                     // A copied picture keeps the source's height, even where the server calls the stream a direct stream.
                     copyDemand != null -> sourceVideo?.height
@@ -1436,6 +1516,9 @@ class PlaybackRepository @Inject constructor(
                 .onFailure { Log.w(TAG, "Playback report '$what' failed", it) }
         }
     }
+
+    /** Nixie (tv-1.0.1): an answer that can play: no error code, and a source. */
+    private fun PlaybackInfoResponse.playable(): Boolean = errorCode == null && mediaSources.isNotEmpty()
 
     /** Gives back the live streams [info] opened: on the server, each answer is one more user of a channel's tuner. */
     private suspend fun closeLiveStreams(api: ApiClient, info: PlaybackInfoResponse) =

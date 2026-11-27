@@ -28,6 +28,9 @@ data class SettingsState(
     val profiles: Map<String, ProfileSettings> = emptyMap(),
     /** Profiles already asked whether to take the settings of another device (see [SettingsSync]). */
     val restoreOffered: Set<String> = emptySet(),
+    // Nixie (tv-1.0.1): the profiles whose server refused a smaller stream (SmallerStreamRefusals), by profileKey; this
+    // device's alone, so never in a profile's settings, which go to the server as a copy.
+    val nixieRefusedSmaller: Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller> = emptyMap(),
 )
 
 internal fun profileKey(serverId: String, userId: String) = "$serverId/$userId"
@@ -134,5 +137,20 @@ class SettingsRepository @Inject constructor(
         it.copy(
             subtitleStyle = transform(it.subtitleStyle),
         )
+    }
+
+    // Nixie (tv-1.0.1): the smaller-stream refusals of every profile on this device (SmallerStreamRefusals).
+    suspend fun refusedSmaller(): Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller> =
+        store.data.first().nixieRefusedSmaller
+
+    suspend fun updateRefusedSmaller(
+        transform: (
+            Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller>,
+        ) -> Map<String, io.github.mbustos27.nixie.tv.data.play.RefusedSmaller>,
+    ) {
+        store.updateData { state ->
+            val next = transform(state.nixieRefusedSmaller)
+            if (next == state.nixieRefusedSmaller) state else state.copy(nixieRefusedSmaller = next)
+        }
     }
 }

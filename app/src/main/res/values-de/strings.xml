@@ -513,6 +513,7 @@
     <string name="player_info_reason_recovered">Leitung wieder gut</string>
     <string name="player_lower_quality">Verbindung zu langsam · wechselt zu niedrigerer Qualität</string>
     <string name="player_full_quality">Verbindung wieder gut · zurück zur vollen Qualität</string>
+    <string name="player_smaller_refused">Der Server erstellt keinen kleineren Stream, deshalb spielt Nixie das Original. Es kann zum Laden pausieren.</string>
     <string name="player_info_why">Warum</string>
     <string name="player_info_on_server">Datei auf dem Server</string>
     <string name="player_info_to_device">Stream zum Gerät</string>

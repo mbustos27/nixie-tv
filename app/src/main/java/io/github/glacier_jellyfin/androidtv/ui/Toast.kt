@@ -58,18 +58,24 @@ val LocalToaster = staticCompositionLocalOf { Toaster() }
 /** Width of a toast; the navigation pill keeps this much room free at the top right. */
 const val TOAST_WIDTH = 440
 
+// Nixie (tv-1.0.1): how long a toast shows, by its length.
+private const val TOAST_MS_PER_CHAR = 60L
+private const val TOAST_MIN_MS = 2200L
+private const val TOAST_MAX_MS = 6500L
+
 /**
  * The design's toast outside the player: a card at the top right that
- * disappears after 2.2 s, below the [MiniPlayer] while music is loaded. Only
+ * disappears after 2.2 s (a long notice stays longer), below the [MiniPlayer] while music is loaded. Only
  * the "notice" tone is used so far.
  */
 @Composable
 fun BoxScope.ToastHost(toaster: Toaster) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(toaster.sequence) {
-        if (toaster.message == null) return@LaunchedEffect
+        val message = toaster.message ?: return@LaunchedEffect
         visible = true
-        delay(2200)
+        // Nixie (tv-1.0.1): a notice of two sentences gets the time to read it; a short one keeps 2.2 s.
+        delay((message.length * TOAST_MS_PER_CHAR).coerceIn(TOAST_MIN_MS, TOAST_MAX_MS))
         visible = false
     }
     AnimatedVisibility(

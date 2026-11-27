@@ -79,7 +79,24 @@ class SessionManager @Inject constructor(
     suspend fun signOut() {
         val current = endOnServer() ?: return
         accounts.forgetToken(current.server.id, current.user.userId)
+        nixieSignedOut(current)
         _session.value = null
+    }
+
+    // Nixie (tv-1.0.1): what else a profile's sign-out forgets on this device (the smaller-stream refusals).
+    private val nixieSignOutHooks = java.util.concurrent.CopyOnWriteArrayList<suspend (String, String) -> Unit>()
+
+    /** [hook] runs with the server and user id of every profile that signs out or is removed from this device. */
+    fun onSignOut(hook: suspend (serverId: String, userId: String) -> Unit) {
+        nixieSignOutHooks += hook
+    }
+
+    private suspend fun nixieSignedOut(current: Session) {
+        for (hook in nixieSignOutHooks) {
+            io.github.glacier_jellyfin.androidtv.core.jellyfin.runSuspendCatching {
+                hook(current.server.id, current.user.userId)
+            }.onFailure { Log.w(TAG, "Forgetting what the profile left on this device failed", it) }
+        }
     }
 
     /**
@@ -89,6 +106,7 @@ class SessionManager @Inject constructor(
     suspend fun removeFromDevice() {
         val current = endOnServer() ?: return
         accounts.removeUser(current.server.id, current.user.userId)
+        nixieSignedOut(current)
         _session.value = null
     }
 

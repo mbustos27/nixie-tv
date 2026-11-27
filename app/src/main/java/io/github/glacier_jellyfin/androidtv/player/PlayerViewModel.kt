@@ -293,6 +293,9 @@ class PlayerViewModel @Inject constructor(
     private var openRetries = 0
     private var lastSeekMs = 0L
 
+    /** Nixie (tv-1.0.1): this title already said that the server refused a smaller stream. */
+    private var smallerRefusedShown = false
+
     /** Waits out a stall that does not end. */
     private var stallWatch: Job? = null
 
@@ -583,6 +586,7 @@ class PlayerViewModel @Inject constructor(
         linkRetries = 0
         openRetries = 0
         returns = 0
+        smallerRefusedShown = false
         stalls.clear()
         val selection = trackSelections.get(itemId)
         versionId = selection?.versionId
@@ -660,6 +664,11 @@ class PlayerViewModel @Inject constructor(
                 )
                 source = opened
                 nixieTiming?.mark("server answer") // Nixie (rule 10)
+                // Nixie (tv-1.0.1): the link wanted a smaller stream and the server refused it: said once per title.
+                if (opened.smallerRefused && !smallerRefusedShown) {
+                    smallerRefusedShown = true
+                    viewModelScope.launch { _events.send(UiEvent.Toast(R.string.player_smaller_refused)) }
+                }
                 recordTracks(opened.audioIndex, opened.subtitleIndex)
                 val request = streamRequest(opened, start).copy(snapStart = snapStart)
                 val playback = GlacierPlayer.create(context, request)
@@ -1068,6 +1077,8 @@ class PlayerViewModel @Inject constructor(
         val streamBitrate = current.streamBitrate ?: return
         val reduced = streamBitrate < wanted
         if (current.live || current.ladder != null) return
+        // Nixie (tv-1.0.1): the server refused anything smaller than the file: no step down to measure for.
+        if (current.smallerRefused) return
         // The file as it is: only a step down is possible. A reduced stream: only the way back.
         if (if (reduced) {
                 returns >= MAX_RETURNS
@@ -1509,8 +1520,10 @@ class PlayerViewModel @Inject constructor(
         val streamBitrate = current.streamBitrate
         // Only "Auto" decides by itself; a chosen cap stays. Live TV has no bitrate to lower.
         // Tiers follow the link by themselves; a new stream is for the one that cannot.
+        // Nixie (tv-1.0.1): nor a file whose server refused anything smaller (PlaybackSource.smallerRefused).
         if (current.ladder != null || current.live || streamBitrate == null || qualitySteps >= MAX_QUALITY_STEPS ||
-            streamBitrate <= StreamBudget.FLOOR || settings.settings.value.playback.maxBitrate != MaxBitrate.Auto
+            streamBitrate <= StreamBudget.FLOOR || settings.settings.value.playback.maxBitrate != MaxBitrate.Auto ||
+            current.smallerRefused
         ) {
             return false
         }

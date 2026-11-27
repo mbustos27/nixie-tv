@@ -59,7 +59,10 @@ internal data class FakeTitle(
     val channels: Int = 6,
     val container: String = "mkv",
     val videoBitrate: Int = 60_000_000,
-)
+) {
+    /** The file's bitrate: the picture and its audio track (1 Mbit/s). */
+    val bitrate: Int get() = videoBitrate + 1_000_000
+}
 
 /** What the fake server chose for one PlaybackInfo request. */
 internal sealed interface Choice {
@@ -74,29 +77,51 @@ internal sealed interface Choice {
         val maxHeight: Int?,
         val reasons: List<String>,
     ) : Choice
+
+    /** Nixie (tv-1.0.1): what the server would have made ([wanted]), refused with NoCompatibleStream. */
+    data class Refused(val wanted: Choice) : Choice
 }
+
+/** Nixie (tv-1.0.1): a server where this user may not transcode or remux: everything but direct play is refused. */
+internal val NO_TRANSCODES: (PlaybackInfoDto, Choice) -> Boolean = { _, choice -> choice != Choice.DirectPlay }
 
 /**
  * A server that decides like Jellyfin's StreamBuilder, cut down to what a video file needs: the direct play profiles
  * (container, codecs) and the codec profiles' conditions (size, level, profile, bit depth, range, audio). Every posted
  * device profile is kept in [asked] and every choice in [choices]. Nothing goes over a network.
  */
-internal class FakePlaybackServer(private val title: FakeTitle) {
+internal class FakePlaybackServer(
+    private val title: FakeTitle,
+    // Nixie (tv-1.0.1): where the bandwidth test goes (a FakeLink); the API itself never leaves this process.
+    private val address: String = "http://home.invalid",
+    // Nixie (tv-1.0.1): the answers the server refuses with NoCompatibleStream (see NO_TRANSCODES).
+    private val refuses: (PlaybackInfoDto, Choice) -> Boolean = { _, _ -> false },
+) {
     val asked: MutableList<PlaybackInfoDto> = java.util.Collections.synchronizedList(mutableListOf())
     val choices: MutableList<Choice> = java.util.Collections.synchronizedList(mutableListOf())
 
+    /** Nixie (tv-1.0.1): the app's settings file, kept from one [repository] to the next (as across a restart). */
+    private var settingsStore: MemoryStore<SettingsState>? = null
+
+    /** Nixie (tv-1.0.1): the sessions of the last [repository], to sign out. */
+    lateinit var sessions: SessionManager
+
     /**
      * A signed-in [PlaybackRepository] on this server for a device with [capabilities] whose panel is [mode] and whose
-     * UI is [ui], with the bitrate setting at 120 Mbit/s (a cap: no link measurement, no ladder).
+     * UI is [ui], with the bitrate setting at 120 Mbit/s (a cap: no link measurement, no ladder), or [maxBitrate].
+     * [deviceId]: the sign-in's own device id (a new sign-in has a new one).
      */
     fun repository(
         capabilities: DeviceCapabilities,
         mode: Pair<Int, Int>?,
         ui: Pair<Int, Int>,
         hdAudio: Boolean = false,
+        maxBitrate: io.github.glacier_jellyfin.androidtv.core.data.settings.MaxBitrate =
+            io.github.glacier_jellyfin.androidtv.core.data.settings.MaxBitrate.M120,
+        deviceId: String = "d",
     ): PlaybackRepository {
-        val server = StoredServer("s1", "Home", "http://home.invalid", "12.4.0", lastUsedAt = 0)
-        val user = StoredUser("s1", USER.toString(), "anna", null, "t", lastUsedAt = 0, deviceId = "d")
+        val server = StoredServer("s1", "Home", address, "12.4.0", lastUsedAt = 0)
+        val user = StoredUser("s1", USER.toString(), "anna", null, "t", lastUsedAt = 0, deviceId = deviceId)
         val accounts = AccountRepository(MemoryStore(AccountState(servers = listOf(server), users = listOf(user))))
         val jellyfin = Jellyfin(
             JellyfinOptions(
@@ -109,23 +134,20 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
             ),
         )
         val sessions = SessionManager(jellyfin, accounts, Authenticator(jellyfin))
+        this.sessions = sessions
         runBlocking { check(sessions.open("s1", USER.toString())) }
         val playback = PlaybackSettings(
-            maxBitrate = io.github.glacier_jellyfin.androidtv.core.data.settings.MaxBitrate.M120,
+            maxBitrate = maxBitrate,
             hdAudio = if (hdAudio) {
                 io.github.glacier_jellyfin.androidtv.core.data.settings.HdAudioOutput.ServerEac3
             } else {
                 io.github.glacier_jellyfin.androidtv.core.data.settings.HdAudioOutput.Glacier
             },
         )
-        val settings = SettingsRepository(
-            MemoryStore(
-                SettingsState(
-                    profiles = mapOf(profileKey("s1", USER.toString()) to ProfileSettings(playback = playback)),
-                ),
-            ),
-            sessions,
-        )
+        val profiles = mapOf(profileKey("s1", USER.toString()) to ProfileSettings(playback = playback))
+        val store = settingsStore?.also { it.data.value = it.data.value.copy(profiles = profiles) }
+            ?: MemoryStore(SettingsState(profiles = profiles)).also { settingsStore = it }
+        val settings = SettingsRepository(store, sessions)
         val detector = mockk<MediaCapabilityDetector> {
             every { this@mockk.capabilities } returns capabilities
             every { iec61937() } returns false
@@ -150,7 +172,8 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
             }
             if (!direct) add("VideoCodecNotSupported")
             profile.applying(CodecType.VIDEO, title.videoCodec).filterNot(::holds).forEach { add(reason(it.property)) }
-            if ((dto.maxStreamingBitrate ?: Int.MAX_VALUE) < title.videoBitrate) add("ContainerBitrateExceedsLimit")
+            // Against the file's bitrate, as Jellyfin does (Nixie tv-1.0.1: it was the picture's alone).
+            if ((dto.maxStreamingBitrate ?: Int.MAX_VALUE) < title.bitrate) add("ContainerBitrateExceedsLimit")
         }.distinct()
         val audio = buildList {
             val direct = profile.directPlayProfiles.any {
@@ -173,7 +196,7 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
                     video + audio,
                 )
             }
-        }
+        }.let { if (refuses(dto, it)) Choice.Refused(it) else it }
         choices += choice
         return playbackInfo(choice)
     }
@@ -224,7 +247,7 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
     }
 
     private fun transcodingUrl(choice: Choice): String? = when (choice) {
-        Choice.DirectPlay -> null
+        Choice.DirectPlay, is Choice.Refused -> null
 
         is Choice.CopyVideo ->
             "/videos/$ITEM/master.m3u8?MediaSourceId=$SOURCE&VideoCodec=${title.videoCodec}&AudioCodec=eac3" +
@@ -242,15 +265,17 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
     private fun playbackInfo(choice: Choice): String {
         val direct = choice == Choice.DirectPlay
         val url = transcodingUrl(choice)
+        // Nixie (tv-1.0.1): a refusal as Jellyfin answers it: the source with nothing allowed, and the error code.
+        val refused = choice is Choice.Refused
         val dolbyVision = title.dolbyVisionProfile?.let { ""","DvProfile":$it,"DvLevel":6""" } ?: ""
         return """
             {"MediaSources":[{"Protocol":"File","Id":"$SOURCE","Path":"/media/film.mkv","Type":"Default",
              "Container":"${title.container}","Size":1000000000,"Name":"Film","IsRemote":false,"ETag":"e",
              "RunTimeTicks":72000000000,"ReadAtNativeFramerate":false,"IgnoreDts":false,"IgnoreIndex":false,
-             "GenPtsInput":false,"SupportsTranscoding":true,"SupportsDirectStream":$direct,"SupportsDirectPlay":$direct,
+             "GenPtsInput":false,"SupportsTranscoding":${!refused},"SupportsDirectStream":$direct,"SupportsDirectPlay":$direct,
              "IsInfiniteStream":false,"UseMostCompatibleTranscodingProfile":false,"RequiresOpening":false,
              "RequiresClosing":false,"RequiresLooping":false,"SupportsProbing":true,"VideoType":"VideoFile",
-             "MediaAttachments":[],"Formats":[],"Bitrate":${title.videoBitrate + 1_000_000},"RequiredHttpHeaders":{},
+             "MediaAttachments":[],"Formats":[],"Bitrate":${title.bitrate},"RequiredHttpHeaders":{},
              "TranscodingSubProtocol":"${if (url == null) "http" else "hls"}",
              ${url?.let { "\"TranscodingUrl\":\"$it\",\"TranscodingContainer\":\"ts\"," } ?: ""}
              "HasSegments":false,"DefaultAudioStreamIndex":1,"DefaultSubtitleStreamIndex":-1,
@@ -268,6 +293,7 @@ internal class FakePlaybackServer(private val title: FakeTitle) {
                "AudioSpatialFormat":"None","VideoRange":"Unknown","VideoRangeType":"Unknown","Type":"Audio","Index":1,
                "IsExternal":false,"IsTextSubtitleStream":false,"SupportsExternalStream":false,"Level":0}
              ]}],
+             ${if (refused) "\"ErrorCode\":\"NoCompatibleStream\"," else ""}
              "PlaySessionId":"p${asked.size}"}
         """.trimIndent()
     }
