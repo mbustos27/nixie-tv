@@ -30,4 +30,5 @@
     <string name="nixie_search_people">Personas</string>
     <string name="nixie_search_person">Persona</string>
     <string name="nixie_search_show_more">Mostrar %1$d más</string>
+    <string name="nixie_smaller_refused">El servidor no crea una transmisión más pequeña, así que Nixie reproduce el original. Puede pausarse para cargar.</string>
 </resources>

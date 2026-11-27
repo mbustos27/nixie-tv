@@ -20,4 +20,6 @@
     <string name="nixie_server_removed">%1$s removed from this TV</string>
     <string name="nixie_server_removing">Removing %1$s …</string>
     <string name="nixie_signin_server_gone">That server is no longer on this TV. Pick a server or add it again.</string>
+    <!-- tv-1.0.1: Settings › System › About, beside the source link: is.gd/nixietv and the Downloader code. -->
+    <string name="nixie_install_link">Install on another TV</string>
 </resources>

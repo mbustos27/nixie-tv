@@ -670,7 +670,7 @@ class PlayerViewModel @Inject constructor(
                 // Nixie (tv-1.0.1): the link wanted a smaller stream and the server refused it: said once per title.
                 if (opened.smallerRefused && !smallerRefusedShown) {
                     smallerRefusedShown = true
-                    viewModelScope.launch { _events.send(UiEvent.Toast(R.string.player_smaller_refused)) }
+                    viewModelScope.launch { _events.send(UiEvent.Toast(R.string.nixie_smaller_refused)) }
                 }
                 recordTracks(opened.audioIndex, opened.subtitleIndex)
                 val request = streamRequest(opened, start).copy(snapStart = snapStart)

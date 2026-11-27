@@ -18,4 +18,5 @@
     <string name="nixie_server_removed">%1$s quitado de esta TV</string>
     <string name="nixie_server_removing">Quitando %1$s …</string>
     <string name="nixie_signin_server_gone">Ese servidor ya no está en esta TV. Elige un servidor o vuelve a añadirlo.</string>
+    <string name="nixie_install_link">Instalar en otro televisor</string>
 </resources>

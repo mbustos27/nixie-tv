@@ -30,4 +30,5 @@
     <string name="nixie_search_people">Personen</string>
     <string name="nixie_search_person">Person</string>
     <string name="nixie_search_show_more">%1$d weitere zeigen</string>
+    <string name="nixie_smaller_refused">Der Server erstellt keinen kleineren Stream, deshalb spielt Nixie das Original. Es kann zum Laden pausieren.</string>
 </resources>

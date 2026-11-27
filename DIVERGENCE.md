@@ -465,3 +465,23 @@ Nixie's own files: `PRIVACY.md`, `docs/PUBLISH-CHECKLIST.md`, and the issue form
 |---|---|---|
 | `docs/RELEASING.md` | Nixie's: the GitHub-only release (the owner signs with apksigner, `nixie-release` checks and writes the `.sha256`, `gh release create` with `Nixie-TV-<version>.apk`, its `.sha256` and `nixie-tv.apk`, the digest and short-link checks, full releases only), the signing key held by the owner, the gate, the staging build, the log pull, the updater's local test with Nixie's names; Glacier's release workflow, store versions, listings and signing secrets gone | Glacier's described a release Nixie doesn't have. On a merge, keep Nixie's version |
 | `CHANGELOG.md` | Nixie's header and Nixie's versions (1.0.0 first) above `## [Glacier's releases]`, a heading that is no version: `release-notes.sh` stops there and the updater's `Changelog.parse` skips what follows it until Glacier's `## [0.10.1]`. Glacier's sections up to 0.10.1 stay below as the base | The release notes are Nixie's. On a merge, keep Nixie's header and sections; Glacier's later notes stay in Glacier's changelog, and what Nixie takes from them goes into Nixie's next section |
+
+## 1.0.1: a server that refuses a smaller stream (tv-1.0.1, 2026-11-27)
+
+Nixie's own files: `core/data/src/main/java/io/github/mbustos27/nixie/tv/data/play/SmallerStreamRefusals.kt` (the
+refusal memory), `app/src/main/java/io/github/mbustos27/nixie/tv/play/EndsAtClock.kt`, `app/.../nixie/tv/InstallLink.kt`,
+`nixie_smaller_refused` in `nixie_play_strings.xml` and `nixie_install_link` in `nixie_strings.xml` (en, de, es), their
+tests (`RefusedSmallerStreamTest` with `FakeLink`, `OriginalRetryTest`, `InstallLinkTest`, `EndsAtClockTest`) and the
+gate's `RefusedTranscodeGate` on the TV's fake Jellyfin (`tvserver.py --refuse-transcodes --bitrate-test-kbps`).
+
+| File | Change | Why |
+|---|---|---|
+| `core/data/.../playback/PlaybackRepository.kt` | A refused smaller ask (`askAgain`: an error code or no source) keeps the answer before it, for the link's, the cap's and the display's asks; a refused ladder tier is dropped; `PlaybackSource.smallerRefused` when the kept answer is the file; a NoCompatibleStream is remembered (`refusals`), and the memory skips the ask and the wait for the link test; `downloadBps` timed from the first byte (`BandwidthProbe.Reading`), a read that timed out with no bytes at the floor, a connection or HTTP error no reading | The 1.0.1 Blocker: nothing played in Auto on a server that refuses transcodes |
+| `core/data/.../playback/BandwidthProbe.kt` | `reading()` from the first byte; `needsSecond(Reading)`: a second download unless the first shows more than any stream may use, or a slow link with 64 KiB behind its first byte; `SECOND_MIN_BYTES`, `SECOND_MAX_MS` | The link test read a home Wi-Fi link as 440 kbit/s |
+| `core/data/.../SessionManager.kt` | `onSignOut` hooks, run by `signOut` and `removeFromDevice` | The refusal memory is forgotten at sign-out |
+| `core/data/.../settings/SettingsRepository.kt` | `SettingsState.nixieRefusedSmaller`, `refusedSmaller()`, `updateRefusedSmaller()` | The memory in the app's own settings file, never in the copy on the server |
+| `app/.../player/PlayerViewModel.kt` | The notice once per title; `nothingToLower` (also for `smallerRefused`, out of `lowerQuality`'s condition); `watchRecovery` stops for it; `retryOriginal`, and the open's retry after a network error within `openRetries` | The original has nothing smaller to step down to |
+| `app/.../ui/Toast.kt` | A toast stays by its length, 2.2 to 6.5 s | The notice is two sentences |
+| `app/.../settings/SettingsScreen.kt` | About: "Install on another TV" (`InstallLink`), not in a store's build | The release's short link in the app |
+| `app/.../player/PlayerOsd.kt`, `app/.../detail/DetailScreen.kt` | "Ends at" and the player's clock through `rememberEndsAtClock()`: the TV's 12- or 24-hour setting | They were always 24-hour |
+| `app/detekt-baseline.xml` | `lowerQuality`'s old condition dropped: it moved to `nothingToLower` | |

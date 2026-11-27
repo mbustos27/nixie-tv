@@ -31,4 +31,6 @@
     <string name="nixie_search_people">People</string>
     <string name="nixie_search_person">Person</string>
     <string name="nixie_search_show_more">Show %1$d more</string>
+    <!-- tv-1.0.1: the link wanted a smaller stream, the server refused it, and the file plays as it is. -->
+    <string name="nixie_smaller_refused">The server won’t make a smaller stream, so Nixie is playing the original. It may pause to load.</string>
 </resources>
