@@ -1042,10 +1042,10 @@ private fun endsAtText(item: MediaItem): String? {
             value = LocalTime.now()
         }
     }
-    return stringResource(R.string.detail_ends_at, now.plusMinutes(minutes.toLong()).format(ClockFormat))
+    // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock.
+    val clock = io.github.mbustos27.nixie.tv.play.rememberEndsAtClock()
+    return stringResource(R.string.detail_ends_at, now.plusMinutes(minutes.toLong()).format(clock))
 }
-
-private val ClockFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private const val CLOCK_TICK_MS = 15_000L
 
 /** The video format only, e.g. "4K HDR". Audio languages could grow the line without bound. */

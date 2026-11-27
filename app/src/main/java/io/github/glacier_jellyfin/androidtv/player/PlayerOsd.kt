@@ -69,7 +69,6 @@ import io.github.glacier_jellyfin.androidtv.core.designsystem.PillShape
 import io.github.glacier_jellyfin.androidtv.ui.seasonLabel
 import io.github.mbustos27.nixie.tv.designsystem.NixieTheme
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 
@@ -207,7 +206,8 @@ fun PlayerOsd(
                 if (progress.durationMs > 0) {
                     val end = now.plusSeconds((progress.durationMs - progress.positionMs).coerceAtLeast(0) / 1000)
                     Text(
-                        stringResource(R.string.player_ends_at, end.format(ClockFormat)),
+                        // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock.
+                        stringResource(R.string.player_ends_at, end.format(io.github.mbustos27.nixie.tv.play.rememberEndsAtClock())),
                         style = GlacierText.body(18),
                         color = OsdSecondary,
                     )
@@ -248,7 +248,9 @@ private fun TitleBlock(state: PlayerUiState, modifier: Modifier) {
 /** The time of day. Quality and delivery live in the info panel. */
 @Composable
 private fun Clock(now: LocalTime, modifier: Modifier) {
-    Text(now.format(ClockFormat), modifier, style = GlacierText.display(34), color = GlacierColors.Ice)
+    // Nixie (tv-1.0.1): the TV's 12- or 24-hour clock, like "Ends at" beside it.
+    val clock = io.github.mbustos27.nixie.tv.play.rememberEndsAtClock()
+    Text(now.format(clock), modifier, style = GlacierText.display(34), color = GlacierColors.Ice)
 }
 
 /**
@@ -603,7 +605,6 @@ internal val OsdSecondary get() = NixieTheme.tokens.mist.takeOrElse { Color(0xFF
 
 private fun fraction(value: Long, total: Long): Float = (value.toFloat() / total).coerceIn(0f, 1f)
 
-private val ClockFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private const val CLOCK_TICK_MS = 1_000L
 
 /** 1:02:03 or 12:34. */

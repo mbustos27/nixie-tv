@@ -2018,6 +2018,12 @@ private fun systemRows(state: SettingsUiState, viewModel: SettingsViewModel): Li
                     stringResource(R.string.settings_source_sub),
                     SOURCE_URL,
                 ),
+                // Nixie (tv-1.0.1): the short link that installs Nixie on another TV, and its Downloader code.
+                info(
+                    stringResource(R.string.nixie_install_link),
+                    INSTALL_DOWNLOADER,
+                    INSTALL_URL,
+                ),
                 // Nixie: the credit to Glacier, which Nixie for TV is built on.
                 info(
                     stringResource(R.string.nixie_based_on),
@@ -2374,6 +2380,10 @@ private fun hostOf(address: String): String = address.substringAfter("://").trim
 
 // Nixie: Nixie for TV's own repository (made before the first release); Glacier's below.
 private const val SOURCE_URL = "github.com/mbustos27/nixie-tv"
+
+// Nixie (tv-1.0.1): the release's short link and Downloader code (CHANGELOG.md's Install section).
+private const val INSTALL_URL = "is.gd/nixietv"
+private const val INSTALL_DOWNLOADER = "Downloader · 6673217"
 private const val GLACIER_URL = "github.com/Glacier-Jellyfin/glacier-androidtv"
 
 // Nixie (play stream): skips from chapters, online lookups (off until switched on) and learned skips.

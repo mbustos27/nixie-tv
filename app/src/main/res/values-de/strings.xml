@@ -1113,6 +1113,7 @@
     <string name="settings_about_sub">Jellyfin-Client für Android TV · GPL-3.0-or-later</string>
     <string name="settings_source">Quellcode</string>
     <string name="settings_source_sub">Fehlermeldungen, Releases und Änderungsprotokoll auf GitHub</string>
+    <string name="nixie_install_link">Auf einem anderen Fernseher installieren</string>
     <string name="settings_ffmpeg">FFmpeg-Audiodecoder</string>
     <string name="settings_ffmpeg_sub">Spielt DTS, TrueHD und anderen Ton ab, den das Gerät selbst nicht decodieren kann</string>
     <string name="settings_ffmpeg_missing">Nicht enthalten</string>
