@@ -5,6 +5,7 @@ package io.github.mbustos27.nixie.tv.data.play
 import io.github.glacier_jellyfin.androidtv.core.data.playback.PlaybackMethod
 import io.github.glacier_jellyfin.androidtv.core.data.playback.PlaybackRepository
 import io.github.glacier_jellyfin.androidtv.core.data.playback.PlaybackSource
+import io.github.glacier_jellyfin.androidtv.core.data.playback.StreamBudget
 import io.github.glacier_jellyfin.androidtv.core.data.settings.MaxBitrate
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.playback.DeviceCapabilities
 import io.github.glacier_jellyfin.androidtv.core.jellyfin.playback.HdrType
@@ -197,6 +198,34 @@ class RefusedSmallerStreamTest {
             assertEquals(PlaybackMethod.DirectPlay, source.method)
             assertEquals("asked only unlimited", listOf(AUTO), server.asked.map { it.maxStreamingBitrate })
             assertEquals("two downloads, the better one counting", 2, link.tests.get())
+        }
+    }
+
+    @Test
+    fun `a link test that gets no bytes before its read times out holds the stream to the floor`() {
+        // Review: 400 kbit/s, and 5 s before the server's first byte (the read gives up after 4): no reading came, which
+        // held nothing back, so the 5.7 Mbit/s file stalled. The floor counts, as before 1.0.1.
+        FakeLink(bitsPerSecond = 400_000, firstByteMs = 5_000).use { link ->
+            val server = FakePlaybackServer(film, link.address)
+            val repository = server.auto()
+            val source = open(repository)
+
+            assertEquals(StreamBudget.FLOOR, repository.budget())
+            assertEquals(PlaybackMethod.Transcode, source.method)
+            assertTrue(server.asked.any { it.maxStreamingBitrate == StreamBudget.FLOOR })
+        }
+    }
+
+    @Test
+    fun `a link test the server answers with an error holds nothing back`() {
+        FakeLink(notFound = true).use { link ->
+            val server = FakePlaybackServer(film, link.address)
+            val repository = server.auto()
+            val source = open(repository)
+
+            assertEquals(null, repository.budget())
+            assertEquals(PlaybackMethod.DirectPlay, source.method)
+            assertEquals(listOf(AUTO), server.asked.map { it.maxStreamingBitrate })
         }
     }
 

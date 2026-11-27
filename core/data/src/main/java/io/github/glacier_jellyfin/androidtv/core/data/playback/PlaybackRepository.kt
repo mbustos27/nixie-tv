@@ -455,6 +455,8 @@ class PlaybackRepository @Inject constructor(
         var firstAt = 0L
         var firstBytes = 0L
         var lastAt = started
+        // Nixie (tv-1.0.1): the server's answer or its bytes stood still past the read timeout.
+        var timedOut = false
         val failed = runSuspendCatching {
             val base = checkNotNull(session.api.baseUrl).trimEnd('/')
             val connection = (
@@ -467,33 +469,42 @@ class PlaybackRepository @Inject constructor(
                 readTimeout = PROBE_READ_TIMEOUT_MS
             }
             try {
-                connection.inputStream.use { input ->
-                    val buffer = ByteArray(PROBE_CHUNK_BYTES)
-                    while (System.nanoTime() < deadline) {
-                        currentCoroutineContext().ensureActive()
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        received += n
-                        // A debug cap makes the test as slow as a stream would be.
-                        delay(DebugThrottle.waitNs(n) / 1_000_000)
-                        lastAt = System.nanoTime()
-                        if (firstAt == 0L) {
-                            firstAt = lastAt
-                            firstBytes = received
-                            maxSteadyMs?.let { deadline = minOf(deadline, firstAt + it * 1_000_000) }
+                // Nixie (tv-1.0.1): a connection that fails is a failed test, like an HTTP error below; a wait for the
+                // answer or its bytes is not.
+                connection.connect()
+                try {
+                    connection.inputStream.use { input ->
+                        val buffer = ByteArray(PROBE_CHUNK_BYTES)
+                        while (System.nanoTime() < deadline) {
+                            currentCoroutineContext().ensureActive()
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            received += n
+                            // A debug cap makes the test as slow as a stream would be.
+                            delay(DebugThrottle.waitNs(n) / 1_000_000)
+                            lastAt = System.nanoTime()
+                            if (firstAt == 0L) {
+                                firstAt = lastAt
+                                firstBytes = received
+                                maxSteadyMs?.let { deadline = minOf(deadline, firstAt + it * 1_000_000) }
+                            }
                         }
                     }
+                } catch (_: SocketTimeoutException) {
+                    // The link stood still for a while: what moved until now is the answer.
+                    timedOut = true
                 }
-            } catch (_: SocketTimeoutException) {
-                // The link stood still for a while: what moved until now is the answer.
             } finally {
                 connection.disconnect()
             }
         }.onFailure {
             if (received == 0L) Log.w(TAG, "Measuring the bandwidth failed", it)
         }.isFailure && received == 0L
-        // Nothing came at all: no reading, so nothing is held back by it.
-        if (failed || received == 0L) return null
+        // An HTTP or connection error: no reading, so nothing is held back by it.
+        if (failed) return null
+        // Nixie (tv-1.0.1): nothing came before the read timed out: the link carries next to nothing, and the floor counts
+        // (StreamBudget.FLOOR, as before 1.0.1). An answer without bytes says nothing.
+        if (received == 0L) return if (timedOut) 0.0 else null
         val bps = BandwidthProbe.reading(
             received,
             lastAt - started,
