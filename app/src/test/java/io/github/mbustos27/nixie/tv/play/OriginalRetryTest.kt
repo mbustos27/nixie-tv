@@ -27,11 +27,9 @@ import io.github.glacier_jellyfin.androidtv.player.VersionChooser
 import io.github.mbustos27.nixie.tv.data.skips.LearnedSkipStore
 import io.github.mbustos27.nixie.tv.data.skips.SkipChain
 import io.github.mbustos27.nixie.tv.data.skips.SkipLearner
-import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll

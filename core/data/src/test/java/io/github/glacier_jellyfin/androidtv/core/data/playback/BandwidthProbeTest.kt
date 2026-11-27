@@ -18,7 +18,7 @@ class BandwidthProbeTest {
         // 1.0.1: a first block of 2 s (524,288 bit/s), timed with the server's wait, was the whole test, and read 440 kbit/s
         // for streams on home Wi-Fi.
         assertEquals(true, BandwidthProbe.needsSecond(Reading(518_000.0)))
-        assertEquals(true, BandwidthProbe.needsSecond(Reading(400_000.0, steadyBytes = 8_192, steadyNanos = 160_000_000)))
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(400_000.0, 8_192, 160_000_000)))
         // A read that timed out with no bytes.
         assertEquals(true, BandwidthProbe.needsSecond(Reading(0.0)))
         assertEquals(true, BandwidthProbe.needsSecond(Reading(50_000_000.0, 122_880, 19_660_800)))

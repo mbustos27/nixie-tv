@@ -458,16 +458,7 @@ class PlaybackRepository @Inject constructor(
         // Nixie (tv-1.0.1): the server's answer or its bytes stood still past the read timeout.
         var timedOut = false
         val failed = runSuspendCatching {
-            val base = checkNotNull(session.api.baseUrl).trimEnd('/')
-            val connection = (
-                URL(
-                    "$base/Playback/BitrateTest?Size=$blockBytes",
-                ).openConnection() as HttpURLConnection
-                ).apply {
-                setRequestProperty("Authorization", session.authorization())
-                connectTimeout = TIER_TIMEOUT_MS
-                readTimeout = PROBE_READ_TIMEOUT_MS
-            }
+            val connection = bitrateTest(session, blockBytes)
             try {
                 // Nixie (tv-1.0.1): a connection that fails is a failed test, like an HTTP error below; a wait for the
                 // answer or its bytes is not.
@@ -508,14 +499,34 @@ class PlaybackRepository @Inject constructor(
         val steadyBytes = received - firstBytes
         val steadyNanos = lastAt - firstAt
         val bps = BandwidthProbe.reading(received, lastAt - started, steadyBytes, steadyNanos)
-        if (Log.verbose) {
-            Log.d(
-                TAG,
-                "Bandwidth test of $blockBytes bytes: first byte after ${(firstAt - started) / 1_000_000} ms, " +
-                    "$received bytes in ${(lastAt - started) / 1_000_000} ms, ${StreamBudget.describe(bps)}",
-            )
-        }
+        logTest(blockBytes, (firstAt - started) / 1_000_000, received, (lastAt - started) / 1_000_000, bps)
         return BandwidthProbe.Reading(bps, steadyBytes, steadyNanos)
+    }
+
+    /** One link test in the detailed log: durations and sizes only. */
+    private fun logTest(
+        blockBytes: Int,
+        firstByteMs: Long,
+        received: Long,
+        tookMs: Long,
+        bps: Double,
+    ) {
+        if (!Log.verbose) return
+        Log.d(
+            TAG,
+            "Bandwidth test of $blockBytes bytes: first byte after $firstByteMs ms, $received bytes in $tookMs ms, " +
+                StreamBudget.describe(bps),
+        )
+    }
+
+    /** The server's test download of [blockBytes], not yet connected. */
+    private fun bitrateTest(session: Session, blockBytes: Int): HttpURLConnection {
+        val base = checkNotNull(session.api.baseUrl).trimEnd('/')
+        return (URL("$base/Playback/BitrateTest?Size=$blockBytes").openConnection() as HttpURLConnection).apply {
+            setRequestProperty("Authorization", session.authorization())
+            connectTimeout = TIER_TIMEOUT_MS
+            readTimeout = PROBE_READ_TIMEOUT_MS
+        }
     }
 
     /**
@@ -980,7 +991,9 @@ class PlaybackRepository @Inject constructor(
                         // The file itself plays: there is no transcode to go back from.
                         if (smallerRefused) fileFits = false
                     }
-                    if (original) Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
+                    if (original) {
+                        Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
+                    }
                 }
             }
             // A video the server has to transcode anyway is made for the display, not for the file's size: a 4K file

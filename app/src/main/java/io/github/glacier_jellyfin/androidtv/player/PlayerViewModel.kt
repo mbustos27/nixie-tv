@@ -546,13 +546,12 @@ class PlayerViewModel @Inject constructor(
                 return
             }
             // A link too slow for the stream ends in a timeout or a closed connection: a smaller stream first.
-            if (error.errorCode in LINK_ERRORS && lowerQuality()) {
-                Log.w(TAG, "The link failed the stream, trying a smaller one", error)
+            // Nixie (tv-1.0.1): the original, which plays because the server refused anything smaller, is tried again where
+            // it was, a few times, before it is an error (retryOriginal).
+            if (error.errorCode in LINK_ERRORS && (lowerQuality() || retryOriginal(current, error))) {
+                Log.w(TAG, "The link failed the stream, trying a smaller one or the original again", error)
                 return
             }
-            // Nixie (tv-1.0.1): the original plays because the server refused anything smaller: a link that failed it is
-            // tried again where it was, a few times, before it is an error.
-            if (error.errorCode in LINK_ERRORS && retryOriginal(current, error)) return
             Log.w(TAG, "Playback failed", error)
             source?.let { playback.reportStopped(it, currentPositionMs(), failed = true) }
             fail(error.failureCode(), onDevice = error.isDeviceFailure())
@@ -709,8 +708,8 @@ class PlayerViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 // Right after a step down the link is still full of the old stream: the server's answer may be late.
-                // Nixie (tv-1.0.1): also an open of the original again after the link failed it (openRetries, retryOriginal).
-                if (e is IOException && (qualitySteps > 0 || openRetries > 0) && openRetries < MAX_OPEN_RETRIES) {
+                // Nixie (tv-1.0.1): also an open of the original again after the link failed it (retriesOpen).
+                if (retriesOpen(e)) {
                     openRetries++
                     Log.w(TAG, "Opening the smaller stream failed, trying again ($openRetries)", e)
                     delay(OPEN_RETRY_DELAY_MS)
@@ -1511,6 +1510,14 @@ class PlayerViewModel @Inject constructor(
         pinnedBitrate = bitrate
         _state.value.playback?.steer(bitrate)
     }
+
+    /**
+     * An open that failed on the network ([e]) is tried again: right after a step down the link is still full of the old
+     * stream, and the server's answer may be late. Nixie (tv-1.0.1): also an open of the original again after the link
+     * failed it ([retryOriginal]); both within [MAX_OPEN_RETRIES].
+     */
+    private fun retriesOpen(e: Exception): Boolean =
+        e is IOException && openRetries < MAX_OPEN_RETRIES && (qualitySteps > 0 || openRetries > 0)
 
     /**
      * Nixie (tv-1.0.1): [current] is the original because the server refused anything smaller, and the link failed it
