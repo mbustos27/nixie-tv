@@ -24,6 +24,29 @@ versions, Glacier's release notes up to that version are kept as the base.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-27
+
+### Install
+- On the TV: type `is.gd/nixietv` into Downloader or a similar downloader app, or enter the code `6673217` in
+  Downloader. Either way you get the newest release. Nixie 1.0.0 also offers this update by itself at its next start,
+  unless its update check is off in Settings › System
+- Or download `Nixie-TV-1.0.1.apk` below and install it over 1.0.0 with a file manager on the box, or from a computer
+  with `adb install -r Nixie-TV-1.0.1.apk`. `Nixie-TV-1.0.1.apk.sha256` is its checksum (SECURITY.md shows how to
+  compare). Your sign-ins and settings stay
+
+### Improved
+- Settings › System shows the short link `is.gd/nixietv` and the Downloader code, for installing Nixie on another TV
+- "Ends at" and the player's clock follow the TV's 12- or 24-hour setting; they were always 24-hour
+
+### Fixed
+- With the bitrate at Auto, nothing played on some servers: when the connection seemed too slow for a title, Nixie
+  asked for a smaller stream, and a server that won't make one (one where your account may not convert videos)
+  refused it, which ended playback. Now the original plays, and Nixie says so: it may pause to load. Nixie remembers
+  that server's answer for a day, so the next titles start without asking
+- The connection test read a home Wi-Fi link as far slower than it was: the wait for the server's first answer
+  counted as a slow connection, and one slow reading was the whole test. It now times the data itself and always
+  measures twice, the better reading counting
+
 ## [1.0.0] - 2026-11-25
 
 ### Install
