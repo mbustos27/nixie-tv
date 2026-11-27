@@ -423,11 +423,16 @@ class PlaybackRepository @Inject constructor(
     /**
      * One download of the server's test, [blockBytes] big: bit/s, or null when it failed. The bytes are counted as they arrive, so
      * a slow link that does not finish within [BandwidthProbe.TIMEOUT_MS] still gives the speed it showed.
+     * Nixie (tv-1.0.1): timed from the first byte (see [BandwidthProbe.reading]); [maxSteadyMs] ends it that long after it.
      */
-    private suspend fun downloadBps(session: Session, blockBytes: Int): Double? {
+    private suspend fun downloadBps(session: Session, blockBytes: Int, maxSteadyMs: Long? = null): Double? {
         val started = System.nanoTime()
-        val deadline = started + BandwidthProbe.TIMEOUT_MS * 1_000_000
+        var deadline = started + BandwidthProbe.TIMEOUT_MS * 1_000_000
         var received = 0L
+        // When the first bytes came, and how many: the time before them is the connection and the server's wait, not the link.
+        var firstAt = 0L
+        var firstBytes = 0L
+        var lastAt = started
         val failed = runSuspendCatching {
             val base = checkNotNull(session.api.baseUrl).trimEnd('/')
             val connection = (
@@ -449,6 +454,12 @@ class PlaybackRepository @Inject constructor(
                         received += n
                         // A debug cap makes the test as slow as a stream would be.
                         delay(DebugThrottle.waitNs(n) / 1_000_000)
+                        lastAt = System.nanoTime()
+                        if (firstAt == 0L) {
+                            firstAt = lastAt
+                            firstBytes = received
+                            maxSteadyMs?.let { deadline = minOf(deadline, firstAt + it * 1_000_000) }
+                        }
                     }
                 }
             } catch (_: SocketTimeoutException) {
@@ -459,8 +470,22 @@ class PlaybackRepository @Inject constructor(
         }.onFailure {
             if (received == 0L) Log.w(TAG, "Measuring the bandwidth failed", it)
         }.isFailure && received == 0L
-        if (failed) return null
-        return BandwidthProbe.bitsPerSecond(received, System.nanoTime() - started)
+        // Nothing came at all: no reading, so nothing is held back by it.
+        if (failed || received == 0L) return null
+        val bps = BandwidthProbe.reading(
+            received,
+            lastAt - started,
+            received - firstBytes,
+            lastAt - firstAt,
+        )
+        if (Log.verbose) {
+            Log.d(
+                TAG,
+                "Bandwidth test of $blockBytes bytes: first byte after ${(firstAt - started) / 1_000_000} ms, " +
+                    "$received bytes in ${(lastAt - started) / 1_000_000} ms, ${StreamBudget.describe(bps)}",
+            )
+        }
+        return bps
     }
 
     /**
@@ -473,9 +498,15 @@ class PlaybackRepository @Inject constructor(
         if (!fresh) currentBudget()?.let { return it }
         // A small block first: on a slow link a big one takes many seconds. The second block is sized by the first result,
         // since a small one is over before a fast connection has sped up. The better of the two counts.
+        // Nixie (tv-1.0.1): a slow first block is measured again too (it may be the connection warming up or the server's
+        // wait), never the whole test; the second runs at most SECOND_MAX_MS from its first byte.
         var measured = downloadBps(session, BandwidthProbe.FIRST_BYTES) ?: return null
         if (BandwidthProbe.needsSecond(measured)) {
-            downloadBps(session, BandwidthProbe.secondBlock(measured))?.let { measured = maxOf(measured, it) }
+            downloadBps(
+                session,
+                BandwidthProbe.secondBlock(measured),
+                maxSteadyMs = BandwidthProbe.SECOND_MAX_MS,
+            )?.let { measured = maxOf(measured, it) }
         }
         // After a stall the stream's own numbers count too: the link may carry less than a short test shows.
         val value = synchronized(this) {
