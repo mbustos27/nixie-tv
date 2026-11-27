@@ -550,6 +550,9 @@ class PlayerViewModel @Inject constructor(
                 Log.w(TAG, "The link failed the stream, trying a smaller one", error)
                 return
             }
+            // Nixie (tv-1.0.1): the original plays because the server refused anything smaller: a link that failed it is
+            // tried again where it was, a few times, before it is an error.
+            if (error.errorCode in LINK_ERRORS && retryOriginal(current, error)) return
             Log.w(TAG, "Playback failed", error)
             source?.let { playback.reportStopped(it, currentPositionMs(), failed = true) }
             fail(error.failureCode(), onDevice = error.isDeviceFailure())
@@ -706,7 +709,8 @@ class PlayerViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 // Right after a step down the link is still full of the old stream: the server's answer may be late.
-                if (e is IOException && qualitySteps > 0 && openRetries < MAX_OPEN_RETRIES) {
+                // Nixie (tv-1.0.1): also an open of the original again after the link failed it (openRetries, retryOriginal).
+                if (e is IOException && (qualitySteps > 0 || openRetries > 0) && openRetries < MAX_OPEN_RETRIES) {
                     openRetries++
                     Log.w(TAG, "Opening the smaller stream failed, trying again ($openRetries)", e)
                     delay(OPEN_RETRY_DELAY_MS)
@@ -1506,6 +1510,27 @@ class PlayerViewModel @Inject constructor(
         retired -= bitrate
         pinnedBitrate = bitrate
         _state.value.playback?.steer(bitrate)
+    }
+
+    /**
+     * Nixie (tv-1.0.1): [current] is the original because the server refused anything smaller, and the link failed it
+     * ([error]): opened again at the current position after a moment, at most [MAX_OPEN_RETRIES] times for the title.
+     * False when that is not the case or the retries are used up.
+     */
+    private fun retryOriginal(current: PlaybackSource?, error: PlaybackException): Boolean {
+        if (current?.smallerRefused != true || openRetries >= MAX_OPEN_RETRIES) return false
+        openRetries++
+        Log.w(TAG, "The link failed the original, opening it again where it was ($openRetries)", error)
+        val player = _state.value.player
+        val position = currentPositionMs()
+        _state.update { it.copy(loading = true) }
+        viewModelScope.launch {
+            delay(OPEN_RETRY_DELAY_MS)
+            if (_state.value.player === player) {
+                reopen(audio = _state.value.audioIndex, subtitle = _state.value.subtitleIndex, at = position)
+            }
+        }
+        return true
     }
 
     /**
