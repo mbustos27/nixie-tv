@@ -928,9 +928,10 @@ class PlaybackRepository @Inject constructor(
                 askAgain(AUTO_BITRATE)
             }
             if (cap != null && info.errorCode == null && info.mediaSources.firstOrNull()?.supportsDirectPlay == false) {
-                // Nixie (tv-1.0.1): a file the server repackages stays when it refuses the cap's stream.
+                // Nixie (tv-1.0.1): a file the server repackages stays when it refuses the cap's stream. Only a file above
+                // the cap (or of unknown bitrate) wants a smaller stream: one within it is asked as before, and no notice.
                 val first = info.mediaSources.first()
-                val file = first.supportsDirectStream && !burnedIn(first)
+                val file = first.supportsDirectStream && !burnedIn(first) && (first.bitrate ?: Int.MAX_VALUE) > cap
                 if (file && refusedBefore()) {
                     smallerRefused = true
                     Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")

@@ -68,6 +68,9 @@ internal data class FakeTitle(
 internal sealed interface Choice {
     data object DirectPlay : Choice
 
+    /** Nixie (tv-1.0.1): the file repackaged as it is (a container the device doesn't play). */
+    data object DirectStream : Choice
+
     /** Only the audio is converted; the picture is copied as it is. */
     data class CopyVideo(val reasons: List<String>) : Choice
 
@@ -177,6 +180,8 @@ internal class FakePlaybackServer(
         val choice = when {
             video.isEmpty() && audio.isEmpty() -> Choice.DirectPlay
 
+            video == listOf(CONTAINER) && audio.isEmpty() -> Choice.DirectStream
+
             video.isEmpty() -> Choice.CopyVideo(audio)
 
             else -> {
@@ -194,11 +199,13 @@ internal class FakePlaybackServer(
 
     /** Why the picture can't play as it is with [profile] and a limit of [maxBitrate]; empty when it can. */
     private fun videoReasons(profile: DeviceProfile, maxBitrate: Int?): List<String> = buildList {
-        val direct = profile.directPlayProfiles.any {
-            it.type == DlnaProfileType.VIDEO && title.container in it.container.split(',') &&
-                title.videoCodec in it.videoCodec.orEmpty().split(',')
+        val video = profile.directPlayProfiles.filter {
+            it.type == DlnaProfileType.VIDEO && title.videoCodec in it.videoCodec.orEmpty().split(',')
         }
-        if (!direct) add("VideoCodecNotSupported")
+        when {
+            video.isEmpty() -> add("VideoCodecNotSupported")
+            video.none { title.container in it.container.split(',') } -> add(CONTAINER)
+        }
         profile.applying(CodecType.VIDEO, title.videoCodec).filterNot(::holds).forEach { add(reason(it.property)) }
         // Against the file's bitrate, as Jellyfin does (Nixie tv-1.0.1: it was the picture's alone).
         if ((maxBitrate ?: Int.MAX_VALUE) < title.bitrate) add("ContainerBitrateExceedsLimit")
@@ -252,6 +259,11 @@ internal class FakePlaybackServer(
     private fun transcodingUrl(choice: Choice): String? = when (choice) {
         Choice.DirectPlay, is Choice.Refused -> null
 
+        Choice.DirectStream ->
+            "/videos/$ITEM/master.m3u8?MediaSourceId=$SOURCE&VideoCodec=${title.videoCodec}" +
+                "&AudioCodec=${title.audioCodec}&AudioStreamIndex=1&VideoBitrate=${title.videoBitrate}" +
+                "&SegmentContainer=ts&TranscodeReasons=$CONTAINER"
+
         is Choice.CopyVideo ->
             "/videos/$ITEM/master.m3u8?MediaSourceId=$SOURCE&VideoCodec=${title.videoCodec}&AudioCodec=eac3" +
                 "&AudioStreamIndex=1&VideoBitrate=${title.videoBitrate}&SegmentContainer=ts" +
@@ -267,6 +279,7 @@ internal class FakePlaybackServer(
 
     private fun playbackInfo(choice: Choice): String {
         val direct = choice == Choice.DirectPlay
+        val stream = direct || choice == Choice.DirectStream
         val url = transcodingUrl(choice)
         // Nixie (tv-1.0.1): a refusal as Jellyfin answers it: the source with nothing allowed, and the error code.
         val refused = choice is Choice.Refused
@@ -275,7 +288,7 @@ internal class FakePlaybackServer(
             {"MediaSources":[{"Protocol":"File","Id":"$SOURCE","Path":"/media/film.mkv","Type":"Default",
              "Container":"${title.container}","Size":1000000000,"Name":"Film","IsRemote":false,"ETag":"e",
              "RunTimeTicks":72000000000,"ReadAtNativeFramerate":false,"IgnoreDts":false,"IgnoreIndex":false,
-             "GenPtsInput":false,"SupportsTranscoding":${!refused},"SupportsDirectStream":$direct,"SupportsDirectPlay":$direct,
+             "GenPtsInput":false,"SupportsTranscoding":${!refused},"SupportsDirectStream":$stream,"SupportsDirectPlay":$direct,
              "IsInfiniteStream":false,"UseMostCompatibleTranscodingProfile":false,"RequiresOpening":false,
              "RequiresClosing":false,"RequiresLooping":false,"SupportsProbing":true,"VideoType":"VideoFile",
              "MediaAttachments":[],"Formats":[],"Bitrate":${title.bitrate},"RequiredHttpHeaders":{},
@@ -353,5 +366,8 @@ internal class FakePlaybackServer(
         val USER: UUID = UUID.nameUUIDFromBytes("anna".toByteArray())
         val ITEM: UUID = UUID.nameUUIDFromBytes("film".toByteArray())
         val SOURCE: String = ITEM.toString().replace("-", "")
+
+        /** Nixie (tv-1.0.1): the reason a file is repackaged (direct stream). */
+        const val CONTAINER = "ContainerNotSupported"
     }
 }

@@ -200,6 +200,39 @@ class RefusedSmallerStreamTest {
         }
     }
 
+    @Test
+    fun `a file within the bitrate setting gets no notice, even after a refusal`() {
+        // Review: with the cap above the file, the memory of an earlier refusal said "won't make a smaller stream".
+        val remuxed = film.copy(container = "asf")
+        val server = FakePlaybackServer(remuxed)
+        val repository = server.repository(device, UHD, FULL_HD, maxBitrate = MaxBitrate.M10)
+        runBlocking { repository.refusals.remember("s1", FakePlaybackServer.USER.toString(), "d") }
+
+        val asks = asksOf(server) { open(repository) }
+        assertEquals(PlaybackMethod.DirectStream, asks.second.method)
+        assertFalse("the file is within the cap: nothing smaller was wanted", asks.second.smallerRefused)
+        assertEquals(listOf(AUTO, 10_000_000), asks.first)
+    }
+
+    @Test
+    fun `a file above the bitrate setting keeps the original when the server refuses the cap`() {
+        val remuxed = film.copy(container = "asf", videoBitrate = 14_000_000)
+        val server = FakePlaybackServer(remuxed, refuses = refusesBelow(remuxed.bitrate))
+        val repository = server.repository(device, UHD, FULL_HD, maxBitrate = MaxBitrate.M10)
+
+        val first = asksOf(server) { open(repository) }
+        assertEquals(PlaybackMethod.DirectStream, first.second.method)
+        assertTrue(first.second.smallerRefused)
+        assertEquals(listOf(AUTO, 10_000_000), first.first)
+        val again = asksOf(server) { open(repository) }
+        assertEquals("remembered: the cap isn't asked again", listOf(AUTO), again.first)
+        assertTrue(again.second.smallerRefused)
+    }
+
+    /** A server that makes the file as it is but refuses every smaller stream. */
+    private fun refusesBelow(bitrate: Int): (org.jellyfin.sdk.model.api.PlaybackInfoDto, Choice) -> Boolean =
+        { dto, _ -> (dto.maxStreamingBitrate ?: Int.MAX_VALUE) < bitrate }
+
     private fun FakePlaybackServer.auto(deviceId: String = "d") =
         repository(device, UHD, FULL_HD, maxBitrate = MaxBitrate.Auto, deviceId = deviceId)
 
