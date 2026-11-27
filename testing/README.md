@@ -30,6 +30,10 @@ synthetic media (no mpv) and writes `<dir>/ready.json`; the app's `SearchServerT
 against it (signing in with Quick Connect and the harness's approval, never the credentials file).
 `NIXIE_TV_LOCAL_TRAILER=1` gives the showcase movie a local trailer file (its own test video, "Teaser"), so the trailer
 player can be checked on the emulator without YouTube; off by default.
+`--refuse-transcodes` makes it a server where the test user may not transcode: a PlaybackInfo below a file's bitrate
+gets that file with nothing allowed and `ErrorCode: NoCompatibleStream`, as a shared server answers; `--bitrate-test-kbps
+N` slows its link test (`/Playback/BitrateTest`) to N kbit/s and nothing else. The basics gate's `RefusedTranscodeGate`
+runs on both (1.0.1); `GET /__harness/tv` names the server's, the test user's and the showcase movie's ids for it.
 
 ```powershell
 # the pinned desktop fake; --desktop-fakeserver DIR (or NIXIE_DESKTOP_FAKESERVER) tries another copy by hand

@@ -72,4 +72,13 @@ object Fixture {
 
     /** gate2 on [second]. */
     val secondUser: GateUser get() = user("secondUser")
+
+    /**
+     * 1.0.1: the TV's fake Jellyfin (testing/fakeserver/tvserver.py) where the test user may not transcode, with a slow
+     * link test; the runner starts it only for the checks that use it.
+     */
+    val refusing: GateServer get() = server("refusing")
+
+    /** The fake's test user on [refusing], not its admin. */
+    val refusingUser: GateUser get() = user("refusingUser")
 }

@@ -10,7 +10,9 @@
      (:app:assembleNixieStaging -Pnixie.stagingAsDebug=true) and the gate's test APK (:gate:assembleDebugAndroidTest).
   2. Servers: the main throwaway Jellyfin (F:\Dev\nixie-real-jellyfin, 8496) and the gate's second one
      (Start-SecondJellyfin.ps1, 8506), started if they do not answer; stopped again at the end only if this run
-     started them (unless -KeepServers).
+     started them (unless -KeepServers). For RefusedTranscodeGate also the TV's fake Jellyfin
+     (testing\fakeserver\tvserver.py, -FakePort 8516) where the test user may not transcode, its link test at
+     -FakeTestKbps; its test video is made once with mpv into -FakeMediaRoot. Always this run's own: shut down at the end.
   3. The emulator: its own (a slot of the TV gates' emulator pool, GateEmulator.ps1, read-only AVD), or -Serial for one
      already up. A desktop harness slot is held only while a theme's checks run, and given back after each theme.
      An emulator that crashes (qemu itself: 0xc0000005 in code of no module, likely its SwiftShader GPU's, in
@@ -45,7 +47,13 @@ param(
     [double]$MinFreeGB = 4,
     [int]$MaxEmulatorCrashes = 3,
     [string]$MainServerRoot = 'F:\Dev\nixie-real-jellyfin',
-    [string]$SecondServerRoot = 'F:\Dev\nixie-gate-jellyfin2'
+    [string]$SecondServerRoot = 'F:\Dev\nixie-gate-jellyfin2',
+    # 1.0.1: the transcode-refusing fake (RefusedTranscodeGate)
+    [int]$FakePort = 8516,
+    [int]$FakeTestKbps = 400,
+    [string]$FakeMediaRoot = 'F:\Dev\nixie-gate-fake-media',
+    [string]$Mpv,
+    [string]$Python = 'python'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -110,20 +118,56 @@ Say "under test: $(Split-Path $Apk -Leaf) ($appPackage, versionCode $appVersion)
 
 $startedServers = @()
 $emulator = $null
+$fakeProcess = $null
+$fakeInfo = $null
 $failed = 0; $passed = 0; $broken = $false
 try {
     # --- 3. the servers ------------------------------------------------------------------------------------------------
-    foreach ($s in @(@{ Name = 'main'; Url = 'http://127.0.0.1:8496'; Start = { powershell -NoProfile -File (Join-Path $MainServerRoot 'Start-RealJellyfin.ps1') } },
-            @{ Name = 'second'; Url = 'http://127.0.0.1:8506'; Start = { powershell -NoProfile -File (Join-Path $PSScriptRoot 'Start-SecondJellyfin.ps1') -Root $SecondServerRoot } })) {
+    foreach ($s in @(@{ Name = 'main'; Url = 'http://127.0.0.1:8496'; Args = @('-File', "`"$(Join-Path $MainServerRoot 'Start-RealJellyfin.ps1')`"") },
+            @{ Name = 'second'; Url = 'http://127.0.0.1:8506'; Args = @('-File', "`"$(Join-Path $PSScriptRoot 'Start-SecondJellyfin.ps1')`"", '-Root', "`"$SecondServerRoot`"") })) {
         $up = try { Invoke-RestMethod "$($s.Url)/System/Info/Public" -TimeoutSec 3 | Out-Null; $true } catch { $false }
         if (-not $up) {
             Say "starting the $($s.Name) server"
-            & $s.Start | ForEach-Object { Say "  $_" }
+            # Its output through a file, not a pipe: the server it starts inherits the start script's handles, so a pipe
+            # would stay open for as long as the server runs, and the gate would wait on it for ever (1.0.1).
+            $startLog = Join-Path $Out "start-$($s.Name)-server.log"
+            $starter = Start-Process -FilePath powershell -ArgumentList (@('-NoProfile') + $s.Args) -WindowStyle Hidden -PassThru `
+                -RedirectStandardOutput $startLog -RedirectStandardError "$startLog.err"
+            $starter.WaitForExit()
+            Get-Content $startLog, "$startLog.err" -ErrorAction SilentlyContinue | Where-Object { $_ } | ForEach-Object { Say "  $_" }
             $startedServers += $s.Name
         }
     }
     $mainInfo = Invoke-RestMethod 'http://127.0.0.1:8496/System/Info/Public' -TimeoutSec 10
     $secondInfo = Invoke-RestMethod 'http://127.0.0.1:8506/System/Info/Public' -TimeoutSec 10
+
+    # --- 3b. the transcode-refusing fake (1.0.1), only for the checks that use it ---------------------------------------
+    if ($targets | Where-Object { $_ -match 'RefusedTranscodeGate' }) {
+        $fakeUrl = "http://127.0.0.1:$FakePort"
+        $taken = try { Invoke-RestMethod "$fakeUrl/System/Info/Public" -TimeoutSec 2 | Out-Null; $true } catch { $false }
+        if ($taken) { throw "port $FakePort answers already: the refusing test server must be this run's own (pass -FakePort)" }
+        $fakeOut = Join-Path $Out 'fakeserver'
+        New-Item -ItemType Directory -Force $fakeOut | Out-Null
+        $ready = Join-Path $fakeOut 'ready.json'
+        $pythonExe = (Get-Command $Python -ErrorAction Stop).Source
+        $fakeArgs = @('-B', (Join-Path $repo 'testing\fakeserver\tvserver.py'), '--profile', 'jellyfin-12', '--out', $fakeOut,
+            '--media', $FakeMediaRoot, '--media-seconds', '120', '--port', $FakePort, '--ready-file', $ready, '--not-admin',
+            '--refuse-transcodes', '--bitrate-test-kbps', $FakeTestKbps)
+        if (-not (Test-Path (Join-Path $FakeMediaRoot 'media.json'))) {
+            $mpvPath = if ($Mpv) { $Mpv } else { (Get-Command mpv -ErrorAction SilentlyContinue).Source }
+            if (-not $mpvPath) { throw "the refusing test server's video is not made yet and no mpv was found: pass -Mpv" }
+            Say "making the refusing test server's video once with mpv (into $FakeMediaRoot)"
+            $fakeArgs += @('--mpv', $mpvPath)
+        }
+        $quoted = $fakeArgs | ForEach-Object { if ("$_" -match '\s') { '"' + $_ + '"' } else { "$_" } }
+        $fakeProcess = Start-Process -FilePath $pythonExe -ArgumentList $quoted -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput (Join-Path $fakeOut 'stdout.log') -RedirectStandardError (Join-Path $fakeOut 'stderr.log')
+        $until = (Get-Date).AddMinutes(10)
+        while (-not (Test-Path $ready) -and -not $fakeProcess.HasExited -and (Get-Date) -lt $until) { Start-Sleep -Milliseconds 500 }
+        if (-not (Test-Path $ready)) { throw "the refusing test server did not start (see $fakeOut\stderr.log)" }
+        $fakeInfo = Invoke-RestMethod "$fakeUrl/System/Info/Public" -TimeoutSec 10
+        Say "refusing test server up at $fakeUrl (transcodes refused, link test at $FakeTestKbps kbit/s)"
+    }
 
     # --- 4. the emulator -----------------------------------------------------------------------------------------------
     if ($Serial) {
@@ -151,6 +195,12 @@ try {
                 other = @{ server = 'main'; name = $mainCred.user.username; password = $mainCred.user.password }
                 secondUser = @{ server = 'second'; name = $secondCred.user.username; password = $secondCred.user.password }
             }
+        }
+        if ($fakeInfo) {
+            # The fake's generated test user (not its admin), from its own credentials file.
+            $fakeCred = Get-Content (Join-Path $repo 'testing\fakeserver\desktop\credentials.json') -Raw | ConvertFrom-Json
+            $fixture.servers.refusing = @{ name = $fakeInfo.ServerName; address = "http://10.0.2.2:$FakePort" }
+            $fixture.users.refusingUser = @{ server = 'refusing'; name = $fakeCred.username; password = $fakeCred.password }
         }
         $local = Join-Path $env:TEMP ("nixie-gate-" + [guid]::NewGuid().ToString('N') + '.json')
         try {
@@ -293,6 +343,12 @@ try {
 } finally {
     if ($script:serial -and (Test-DeviceUp)) { Adb shell "rm -rf $deviceDir" | Out-Null }
     if ($emulator) { Stop-GateEmulator $emulator; Say 'emulator closed, its emulator slot given back' }
+    if ($fakeProcess -and -not $fakeProcess.HasExited) {
+        # This run's own process: asked to shut down, ended by its handle only if it does not.
+        try { Invoke-RestMethod "http://127.0.0.1:$FakePort/__harness/shutdown" -Method Post -TimeoutSec 5 | Out-Null } catch { }
+        if (-not $fakeProcess.WaitForExit(10000)) { try { $fakeProcess.Kill() } catch { } }
+        Say 'refusing test server stopped'
+    }
     if (-not $KeepServers) {
         if ('second' -in $startedServers) { powershell -NoProfile -File (Join-Path $PSScriptRoot 'Stop-SecondJellyfin.ps1') -Root $SecondServerRoot | Out-Null; Say 'second server stopped (this run started it)' }
         if ('main' -in $startedServers) { powershell -NoProfile -File (Join-Path $MainServerRoot 'Stop-RealJellyfin.ps1') | Out-Null; Say 'main server stopped (this run started it)' }

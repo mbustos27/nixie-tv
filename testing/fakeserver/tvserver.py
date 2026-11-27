@@ -15,6 +15,13 @@ server profile from profiles.json laid over it. Standard library only.
 - The server listens on 127.0.0.1 only. The emulator reaches it at 10.0.2.2; a real TV through `adb reverse`.
 - NIXIE_TV_LOCAL_TRAILER=1: the showcase movie also has a local trailer file (its own test video), so the trailer
   player can be checked on the emulator without YouTube. Off by default.
+- --refuse-transcodes (Nixie TV 1.0.1): a server where the test user may not transcode, as a shared server answers: a
+  PlaybackInfo whose MaxStreamingBitrate is below a file's bitrate gets that file with nothing allowed and the
+  ErrorCode NoCompatibleStream (route "playbackinfo-refused" in the summary); an unlimited one plays the file.
+- --bitrate-test-kbps N (Nixie TV 1.0.1): GET /Playback/BitrateTest answers at N kbit/s, a slow link for the app's
+  link test only; the streams themselves are not slowed.
+- GET /__harness/tv (127.0.0.1 only): the server's id, the test user's id and the showcase movie's id, for a check
+  that opens a title the way the TV's home screen does.
 """
 
 import argparse
@@ -54,11 +61,14 @@ def load_desktop(folder):
     return server
 
 
-def tv_server_class(desktop, profile):
-    """A subclass of the desktop Server with `profile` applied."""
+def tv_server_class(desktop, profile, refuse_transcodes=False, bitrate_test_kbps=0):
+    """A subclass of the desktop Server with `profile` applied (and the 1.0.1 options: --refuse-transcodes,
+    --bitrate-test-kbps)."""
 
     class TvServer(desktop.Server):
         tv_profile = profile
+        tv_refuse_transcodes = refuse_transcodes
+        tv_bitrate_test_kbps = bitrate_test_kbps
 
         def __init__(self, *args, **kwargs):
             kwargs["auth"] = profile["auth"]
@@ -122,6 +132,14 @@ def tv_server_class(desktop, profile):
                         if not self._need_auth():
                             return None
                         return self._json(200, local_trailers(outer.lib, m.group(1)))
+                    if low == "/playback/bitratetest" and outer.tv_bitrate_test_kbps > 0:
+                        self.route = "bitrate-test"
+                        return self._slow_bitrate_test()
+                    if low == "/__harness/tv" and method == "GET":
+                        self.route = "harness"
+                        movie = showcase_movie(outer.lib)
+                        return self._json(200, {"server_id": outer.server_id, "user_id": outer.user_id,
+                                                "movie_id": movie})
                     m = PLAYBACK_INFO_RE.fullmatch(low)
                     if m and method == "POST":
                         outer.record_profile(m.group(1), self._body())
@@ -137,7 +155,32 @@ def tv_server_class(desktop, profile):
                         return result
                     return super()._route(method, path)
 
+                def _slow_bitrate_test(self):
+                    """The link test at --bitrate-test-kbps: the bytes go out in 4 KiB pieces, paced from the start."""
+                    size = min(int(self._one("size", "500000")), 10_000_000)
+                    self.status = 200
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(size))
+                    self.end_headers()
+                    started, sent, rate = time.monotonic(), 0, outer.tv_bitrate_test_kbps * 1000
+                    try:
+                        while sent < size:
+                            n = min(4096, size - sent)
+                            self.wfile.write(b"\0" * n)
+                            self.wfile.flush()
+                            sent += n
+                            wait = started + sent * 8 / rate - time.monotonic()
+                            if wait > 0:
+                                time.sleep(wait)
+                    except (ConnectionError, OSError):
+                        pass    # the app stops a test once it has its reading
+                    self.sent = sent
+
                 def _json(self, code, obj):
+                    if outer.tv_refuse_transcodes and code == 200 and getattr(self, "route", None) == "playbackinfo":
+                        if refuse_smaller(obj, self._body(), self._one("maxstreamingbitrate")):
+                            self.route = "playbackinfo-refused"
                     complete_media_streams(obj)
                     if os.environ.get(ENV_LOCAL_TRAILER):
                         count_local_trailer(outer.lib, obj)
@@ -170,6 +213,31 @@ def tv_server_class(desktop, profile):
                 json.dump(dict(profile, url=self.url), f, indent=2)
 
     return TvServer
+
+
+def refuse_smaller(obj, body, query_max=None):
+    """--refuse-transcodes: a PlaybackInfo answer (obj) to a request whose MaxStreamingBitrate (body, or the query's)
+    is below a file's bitrate refuses that file, as a server where the user may not transcode does: nothing allowed,
+    no transcoding URL, and ErrorCode NoCompatibleStream when no file is left. True when it refused one."""
+    if not isinstance(obj, dict):
+        return False
+    limit = body.get("MaxStreamingBitrate") if isinstance(body, dict) else None
+    if limit is None:
+        limit = query_max
+    try:
+        limit = None if limit is None else int(limit)
+    except (TypeError, ValueError):
+        limit = None
+    sources = [s for s in obj.get("MediaSources") or [] if isinstance(s, dict)]
+    if limit is None or not sources:
+        return False
+    refused = [s for s in sources if int(s.get("Bitrate") or 0) > limit]
+    for source in refused:
+        source.update(SupportsDirectPlay=False, SupportsDirectStream=False, SupportsTranscoding=False)
+        source.pop("TranscodingUrl", None)
+    if refused and len(refused) == len(sources):
+        obj["ErrorCode"] = "NoCompatibleStream"
+    return bool(refused)
 
 
 def showcase_movie(lib):
@@ -285,11 +353,16 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--profile", required=True, choices=sorted(profiles))
     ap.add_argument("--desktop-fakeserver", default=os.environ.get(ENV_DESKTOP) or DEFAULT_DESKTOP)
+    ap.add_argument("--refuse-transcodes", action="store_true",
+                    help="refuse every PlaybackInfo below a file's bitrate with NoCompatibleStream")
+    ap.add_argument("--bitrate-test-kbps", type=int, default=0, help="GET /Playback/BitrateTest at this many kbit/s")
     a, rest = ap.parse_known_args(argv)
     desktop = load_desktop(a.desktop_fakeserver)
     profile = profiles[a.profile]
-    desktop.Server = tv_server_class(desktop, profile)
-    print("tvserver: profile %s (Jellyfin %s, %s auth)" % (a.profile, profile["version"], profile["auth"]), flush=True)
+    desktop.Server = tv_server_class(desktop, profile, a.refuse_transcodes, a.bitrate_test_kbps)
+    print("tvserver: profile %s (Jellyfin %s, %s auth)%s%s" % (
+        a.profile, profile["version"], profile["auth"], ", refusing transcodes" if a.refuse_transcodes else "",
+        ", link test at %d kbit/s" % a.bitrate_test_kbps if a.bitrate_test_kbps else ""), flush=True)
     return desktop.main(rest + ["--auth", profile["auth"]])
 
 

@@ -12,6 +12,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -59,9 +60,9 @@ def mb_header(device_id, token=None):
 class ProfileServer:
     """One TV server with a profile, on a free loopback port, in this process."""
 
-    def __init__(self, name):
+    def __init__(self, name, **options):
         self.tmp = tempfile.mkdtemp(prefix="nixie-tvserver-")
-        cls = tvserver.tv_server_class(desktop, PROFILES[name])
+        cls = tvserver.tv_server_class(desktop, PROFILES[name], **options)
         self.srv = cls(os.path.join(self.tmp, "out"), make_media(os.path.join(self.tmp, "media")), CREDS)
         threading.Thread(target=self.srv.serve, daemon=True).start()
 
@@ -256,6 +257,72 @@ class ProfileTests(unittest.TestCase):
                 self.assertEqual([], s.call("/Items/%s/LocalTrailers?userId=%s" % (other, uid), headers=h)[1])
             finally:
                 del os.environ[tvserver.ENV_LOCAL_TRAILER]
+        finally:
+            s.close()
+
+
+class RefusingServerTests(unittest.TestCase):
+    """Nixie TV 1.0.1: the gate's server where the test user may not transcode (--refuse-transcodes), its slow link
+    test (--bitrate-test-kbps) and GET /__harness/tv."""
+
+    def playback_info(self, s, movie, headers, limit):
+        return s.call("/Items/%s/PlaybackInfo" % movie, "POST", {"MaxStreamingBitrate": limit}, headers)
+
+    def test_a_smaller_ask_is_refused_and_an_unlimited_one_plays_the_file(self):
+        s = ProfileServer("jellyfin-12", refuse_transcodes=True)
+        try:
+            h = {"Authorization": mb_header("dev-r", s.password_login("dev-r"))}
+            movie = s.call("/__harness/fixture")[1]["movie"]["id"]
+            status, info = self.playback_info(s, movie, h, 120_000_000)
+            self.assertEqual(200, status)
+            self.assertNotIn("ErrorCode", info)
+            self.assertTrue(info["MediaSources"][0]["SupportsDirectPlay"])
+            status, info = self.playback_info(s, movie, h, 400_000)
+            self.assertEqual(200, status)
+            self.assertEqual("NoCompatibleStream", info["ErrorCode"])
+            source = info["MediaSources"][0]
+            self.assertFalse(source["SupportsDirectPlay"] or source["SupportsDirectStream"] or source["SupportsTranscoding"])
+            self.assertNotIn("TranscodingUrl", source)
+            self.assertEqual(1, s.call("/__harness/summary")[1]["by_route"]["playbackinfo-refused"])
+        finally:
+            s.close()
+
+    def test_without_the_option_a_smaller_ask_is_answered(self):
+        s = ProfileServer("jellyfin-12")
+        try:
+            h = {"Authorization": mb_header("dev-n", s.password_login("dev-n"))}
+            movie = s.call("/__harness/fixture")[1]["movie"]["id"]
+            status, info = self.playback_info(s, movie, h, 400_000)
+            self.assertEqual(200, status)
+            self.assertNotIn("ErrorCode", info)
+        finally:
+            s.close()
+
+    def test_the_link_test_runs_at_the_rate_asked(self):
+        s = ProfileServer("jellyfin-12", bitrate_test_kbps=800)
+        try:
+            started = time.monotonic()
+            with urllib.request.urlopen(s.srv.url + "/Playback/BitrateTest?Size=65536", timeout=10) as r:
+                data = r.read()
+            took = time.monotonic() - started
+            self.assertEqual(65536, len(data))
+            # 65,536 bytes at 800 kbit/s take 0.66 s.
+            self.assertGreater(took, 0.5)
+            self.assertLess(took, 3.0)
+            # The server logs the request after its last byte: closing before that would end its log first.
+            time.sleep(0.3)
+        finally:
+            s.close()
+
+    def test_harness_tv_names_the_server_the_user_and_the_movie(self):
+        s = ProfileServer("jellyfin-12")
+        try:
+            token = s.password_login("dev-i")
+            ids = s.call("/__harness/tv")[1]
+            self.assertEqual(s.call("/System/Info/Public")[1]["Id"], ids["server_id"])
+            uid = s.call("/Users/Me", headers={"Authorization": mb_header("dev-i", token)})[1]["Id"]
+            self.assertEqual(uid.replace("-", ""), ids["user_id"].replace("-", ""))
+            self.assertEqual(tvserver.showcase_movie(s.srv.lib), ids["movie_id"])
         finally:
             s.close()
 

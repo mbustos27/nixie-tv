@@ -162,7 +162,9 @@ Rule 12 of `docs/DESIGN-RULES.md`: every basic path is a release gate. The gate'
 class per `*Gate.kt` file) drive the build with the remote's keys on the emulator against the throwaway Jellyfins
 (never anyone's server): Quick Connect and password sign-ins across a restart and a force-stop, Sign out, a second
 user, profiles and PIN, a second server added, switched and removed, every menu and dialog, every row to its last
-item, Back, the top bar, text fitting. A failed check fails the build like a test:
+item, Back, the top bar, text fitting, and playback in Auto on a server that refuses transcodes over a slow link (the
+TV's fake Jellyfin, `testing/fakeserver`, started by the runner for that check; its test video is made once with mpv).
+A failed check fails the build like a test:
 
 ```powershell
 .\gradlew.bat :gate:basicsGate "-Pnixie.stagingAsDebug=true"   # or .\tools\gate\Run-Gate.ps1
