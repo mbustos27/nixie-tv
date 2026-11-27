@@ -18,6 +18,8 @@ internal class FakeLink(
     private val bitsPerSecond: Long = 0,
     private val firstByteMs: Long = 0,
     private val notFound: Boolean = false,
+    /** The link's speed from the second test on (a link that slows down); null: [bitsPerSecond]. */
+    private val laterBitsPerSecond: Long? = null,
 ) : AutoCloseable {
     private val socket = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
 
@@ -48,7 +50,7 @@ internal class FakeLink(
             out.head("404 Not Found", 0)
             return
         }
-        tests.incrementAndGet()
+        val rate = if (tests.incrementAndGet() > 1) laterBitsPerSecond ?: bitsPerSecond else bitsPerSecond
         Thread.sleep(firstByteMs)
         out.head("200 OK", size)
         val chunk = ByteArray(CHUNK)
@@ -59,9 +61,9 @@ internal class FakeLink(
             out.write(chunk, 0, n)
             out.flush()
             sent += n
-            if (bitsPerSecond > 0) {
+            if (rate > 0) {
                 // Paced against the start, so a sleep that runs long is made up by the next ones.
-                val due = started + sent * 8 * 1_000_000_000L / bitsPerSecond
+                val due = started + sent * 8 * 1_000_000_000L / rate
                 val wait = due - System.nanoTime()
                 if (wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
             }

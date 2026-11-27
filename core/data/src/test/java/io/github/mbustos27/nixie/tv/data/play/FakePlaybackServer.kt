@@ -59,6 +59,8 @@ internal data class FakeTitle(
     val channels: Int = 6,
     val container: String = "mkv",
     val videoBitrate: Int = 60_000_000,
+    /** Nixie (tv-1.0.1): a subtitle track (index 2), the default one, that the server burns into the picture. */
+    val burnedInSubtitle: Boolean = false,
 ) {
     /** The file's bitrate: the picture and its audio track (1 Mbit/s). */
     val bitrate: Int get() = videoBitrate + 1_000_000
@@ -99,6 +101,8 @@ internal class FakePlaybackServer(
     private val address: String = "http://home.invalid",
     // Nixie (tv-1.0.1): the answers the server refuses with NoCompatibleStream (see NO_TRANSCODES).
     private val refuses: (PlaybackInfoDto, Choice) -> Boolean = { _, _ -> false },
+    // Nixie (tv-1.0.1): the HTTP status of each PlaybackInfo answer (401: the token no longer counts).
+    private val status: (PlaybackInfoDto) -> Int = { 200 },
 ) {
     val asked: MutableList<PlaybackInfoDto> = java.util.Collections.synchronizedList(mutableListOf())
     val choices: MutableList<Choice> = java.util.Collections.synchronizedList(mutableListOf())
@@ -294,7 +298,8 @@ internal class FakePlaybackServer(
              "MediaAttachments":[],"Formats":[],"Bitrate":${title.bitrate},"RequiredHttpHeaders":{},
              "TranscodingSubProtocol":"${if (url == null) "http" else "hls"}",
              ${url?.let { "\"TranscodingUrl\":\"$it\",\"TranscodingContainer\":\"ts\"," } ?: ""}
-             "HasSegments":false,"DefaultAudioStreamIndex":1,"DefaultSubtitleStreamIndex":-1,
+             "HasSegments":false,"DefaultAudioStreamIndex":1,
+             "DefaultSubtitleStreamIndex":${if (title.burnedInSubtitle) 2 else -1},
              "MediaStreams":[
               {"Codec":"${title.videoCodec}","Profile":"${title.videoProfile}","Level":${title.level},
                "Width":${title.width},"Height":${title.height},"BitDepth":${title.bitDepth},
@@ -308,6 +313,7 @@ internal class FakePlaybackServer(
                "IsDefault":true,"IsForced":false,"IsHearingImpaired":false,"IsOriginal":false,"IsAVC":false,
                "AudioSpatialFormat":"None","VideoRange":"Unknown","VideoRangeType":"Unknown","Type":"Audio","Index":1,
                "IsExternal":false,"IsTextSubtitleStream":false,"SupportsExternalStream":false,"Level":0}
+              ${if (title.burnedInSubtitle) BURNED_IN_SUBTITLE else ""}
              ]}],
              ${if (refused) "\"ErrorCode\":\"NoCompatibleStream\"," else ""}
              "PlaySessionId":"p${asked.size}"}
@@ -350,7 +356,13 @@ internal class FakePlaybackServer(
         ): RawResponse {
             // The user's configuration (subtitle mode) is not part of these tests: the app goes on without it.
             check(pathTemplate == "/Items/{itemId}/PlaybackInfo") { "not on this server: $pathTemplate" }
-            val body = answer(requestBody as PlaybackInfoDto)
+            val dto = requestBody as PlaybackInfoDto
+            val code = status(dto)
+            if (code != 200) {
+                asked += dto
+                return RawResponse(ByteArray(0), code, emptyMap())
+            }
+            val body = answer(dto)
             return RawResponse(body.toByteArray(), 200, mapOf("content-type" to listOf("application/json")))
         }
     }
@@ -369,5 +381,11 @@ internal class FakePlaybackServer(
 
         /** Nixie (tv-1.0.1): the reason a file is repackaged (direct stream). */
         const val CONTAINER = "ContainerNotSupported"
+
+        /** Nixie (tv-1.0.1): a PGS subtitle the server burns in (DeliveryMethod Encode), after the audio track. */
+        const val BURNED_IN_SUBTITLE = """,{"Codec":"PGSSUB","Language":"eng","IsInterlaced":false,"IsDefault":true,
+            "IsForced":false,"IsHearingImpaired":false,"IsOriginal":false,"IsAVC":false,"AudioSpatialFormat":"None",
+            "VideoRange":"Unknown","VideoRangeType":"Unknown","Type":"Subtitle","Index":2,"IsExternal":false,
+            "IsTextSubtitleStream":false,"SupportsExternalStream":false,"DeliveryMethod":"Encode"}"""
     }
 }

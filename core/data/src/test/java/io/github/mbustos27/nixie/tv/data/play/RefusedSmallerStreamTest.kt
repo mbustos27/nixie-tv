@@ -13,6 +13,7 @@ import io.github.glacier_jellyfin.androidtv.core.jellyfin.playback.VideoCodecSup
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -113,9 +114,10 @@ class RefusedSmallerStreamTest {
     fun `a refused stream for the display keeps the full-size one the server makes`() {
         // HDR10 on a display without HDR: the server converts the picture. It refuses to make it at the display's size.
         val film4k = FakeTitle(width = 3840, height = 2160)
-        val server = FakePlaybackServer(film4k) { _, choice ->
-            choice is Choice.EncodeVideo && (choice.maxWidth ?: Int.MAX_VALUE) < 3840
-        }
+        val server = FakePlaybackServer(
+            film4k,
+            refuses = { _, choice -> choice is Choice.EncodeVideo && (choice.maxWidth ?: Int.MAX_VALUE) < 3840 },
+        )
         val repository = server.repository(device.copy(hdr = emptySet()), FULL_HD, FULL_HD)
         val source = open(repository)
 
@@ -306,6 +308,41 @@ class RefusedSmallerStreamTest {
         val again = asksOf(server) { open(repository) }
         assertEquals("remembered: the cap isn't asked again", listOf(AUTO), again.first)
         assertTrue(again.second.smallerRefused)
+    }
+
+    @Test
+    fun `a burned-in subtitle is not the file - no notice and nothing remembered`() {
+        // The subtitle that shows is burned in: the picture is new whatever the link, so a refusal is no reason to say
+        // "the original" or to skip the ask next time; the answer before the refusal stays, silently.
+        val subtitled = film.copy(burnedInSubtitle = true)
+        FakeLink(notFound = true).use { link ->
+            val server = FakePlaybackServer(subtitled, link.address, refusesBelow(subtitled.bitrate))
+            val repository = server.auto().slow()
+
+            val first = asksOf(server) { open(repository) }
+            assertEquals(listOf(AUTO, 441_000), first.first)
+            assertFalse(first.second.smallerRefused)
+            val again = asksOf(server) { open(repository) }
+            assertEquals("nothing remembered: asked again", listOf(AUTO, 441_000), again.first)
+        }
+    }
+
+    @Test
+    fun `a 401 on the smaller ask still fails the open`() {
+        // The fallback keeps an answer the server refused with an error code; a request it turned away is still an error.
+        FakeLink(notFound = true).use { link ->
+            val server = FakePlaybackServer(
+                film,
+                link.address,
+                status = { if ((it.maxStreamingBitrate ?: AUTO) < AUTO) 401 else 200 },
+            )
+            val repository = server.auto().slow()
+
+            assertThrows(Exception::class.java) { open(repository) }
+            assertEquals(listOf(AUTO, 441_000), server.asked.map { it.maxStreamingBitrate })
+            val again = asksOf(server) { runCatching { open(repository) } }
+            assertEquals("nothing remembered", listOf(AUTO, 441_000), again.first)
+        }
     }
 
     /** A server that makes the file as it is but refuses every smaller stream. */
