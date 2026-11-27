@@ -217,6 +217,56 @@ class RefusedSmallerStreamTest {
     }
 
     @Test
+    fun `a slow link measured solidly in one download doesn't wait for a second`() {
+        // Review: on a 400 kbit/s link the second download added about 4 s to every start.
+        FakeLink(bitsPerSecond = 400_000).use { link ->
+            val server = FakePlaybackServer(film, link.address)
+            val repository = server.auto()
+            val source = open(repository)
+
+            assertEquals("one download", 1, link.tests.get())
+            val budget = repository.budget()!!
+            assertTrue("the link test read $budget", budget in 300_000..360_000)
+            assertEquals(PlaybackMethod.Transcode, source.method)
+        }
+    }
+
+    @Test
+    fun `a remembered refusal plays the file without waiting for the link test`() {
+        // Review: the open waited for the link test although the answer could only be the original.
+        FakeLink(bitsPerSecond = 2_000_000, firstByteMs = 3_000).use { link ->
+            val server = FakePlaybackServer(film, link.address, NO_TRANSCODES)
+            val repository = server.auto()
+            runBlocking { repository.refusals.remember("s1", FakePlaybackServer.USER.toString(), "d") }
+
+            val started = System.nanoTime()
+            val source = open(repository)
+            val tookMs = (System.nanoTime() - started) / 1_000_000
+
+            assertTrue("the open took $tookMs ms, the link test takes 3 s or more", tookMs < 1_500)
+            assertEquals(PlaybackMethod.DirectPlay, source.method)
+            assertEquals(listOf(AUTO), server.asked.map { it.maxStreamingBitrate })
+        }
+    }
+
+    @Test
+    fun `a remembered refusal with a link known to be slow says so without waiting`() {
+        FakeLink(bitsPerSecond = 2_000_000, firstByteMs = 3_000).use { link ->
+            val server = FakePlaybackServer(film, link.address, NO_TRANSCODES)
+            val repository = server.auto().slow()
+            runBlocking { repository.refusals.remember("s1", FakePlaybackServer.USER.toString(), "d") }
+
+            val started = System.nanoTime()
+            val source = open(repository)
+            val tookMs = (System.nanoTime() - started) / 1_000_000
+
+            assertTrue("the open took $tookMs ms", tookMs < 1_500)
+            assertTrue(source.smallerRefused)
+            assertEquals(listOf(AUTO), server.asked.map { it.maxStreamingBitrate })
+        }
+    }
+
+    @Test
     fun `a link test the server answers with an error holds nothing back`() {
         FakeLink(notFound = true).use { link ->
             val server = FakePlaybackServer(film, link.address)

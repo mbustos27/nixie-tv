@@ -44,8 +44,8 @@ versions, Glacier's release notes up to that version are kept as the base.
   refused it, which ended playback. Now the original plays, and Nixie says so: it may pause to load. Nixie remembers
   that server's answer for a day, so the next titles start without asking
 - The connection test read a home Wi-Fi link as far slower than it was: the wait for the server's first answer
-  counted as a slow connection, and one slow reading was the whole test. It now times the data itself and always
-  measures twice, the better reading counting
+  counted as a slow connection, and one slow reading was the whole test. It now times the data itself, and measures a
+  second time, the better reading counting, unless the first already showed a slow connection clearly
 
 ## [1.0.0] - 2026-11-25
 

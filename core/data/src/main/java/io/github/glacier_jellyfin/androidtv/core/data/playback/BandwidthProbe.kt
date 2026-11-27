@@ -51,11 +51,35 @@ internal object BandwidthProbe {
     )
 
     /**
-     * False only when the first block already shows more than any stream may use ([StreamBudget.CEILING] after the
-     * headroom): a low first reading is measured again before it may hold a stream back, since it is mostly the
-     * connection warming up or the wait for the server's answer.
+     * A first reading at or below this speed with [SOLID_STEADY_BYTES] behind it is a slow link, measured: 128 KiB in 2 s,
+     * the old rule's line, now from the first byte.
      */
-    fun needsSecond(firstBps: Double): Boolean = firstBps * StreamBudget.HEADROOM_PERCENT / 100 < StreamBudget.CEILING
+    const val SLOW_BPS = FIRST_BYTES * BITS_PER_BYTE / 2.0
+
+    /** What a slow first reading needs after its first byte to stand without a second download (64 KiB). */
+    const val SOLID_STEADY_BYTES = 65_536L
+
+    /**
+     * One download: its speed ([bitsPerSecond], see [reading]) and what came after its first read ([steadyBytes] in
+     * [steadyNanos]).
+     */
+    data class Reading(
+        val bitsPerSecond: Double,
+        val steadyBytes: Long = 0,
+        val steadyNanos: Long = 0,
+    )
+
+    /**
+     * False when the [first] block already shows more than any stream may use ([StreamBudget.CEILING] after the
+     * headroom), or a slow link with a solid sample ([SLOW_BPS], [SOLID_STEADY_BYTES]): a second download there costs
+     * seconds of start-up and adds little. Any other low first reading is measured again before it may hold a stream
+     * back, since it is mostly the connection warming up or the wait for the server's answer.
+     */
+    fun needsSecond(first: Reading): Boolean = when {
+        first.bitsPerSecond * StreamBudget.HEADROOM_PERCENT / 100 >= StreamBudget.CEILING -> false
+        first.steadyBytes >= SOLID_STEADY_BYTES && first.bitsPerSecond <= SLOW_BPS -> false
+        else -> true
+    }
 
     /** The speed of [bytes] moved in [nanos], in bit/s. */
     fun bitsPerSecond(bytes: Long, nanos: Long): Double {

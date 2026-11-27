@@ -439,7 +439,7 @@ class PlaybackRepository @Inject constructor(
     }
 
     /**
-     * One download of the server's test, [blockBytes] big: bit/s, or null when it failed. The bytes are counted as they arrive, so
+     * One download of the server's test, [blockBytes] big: its reading, or null when it failed. The bytes are counted as they arrive, so
      * a slow link that does not finish within [BandwidthProbe.TIMEOUT_MS] still gives the speed it showed.
      * Nixie (tv-1.0.1): timed from the first byte (see [BandwidthProbe.reading]); [maxSteadyMs] ends it that long after it.
      */
@@ -447,7 +447,7 @@ class PlaybackRepository @Inject constructor(
         session: Session,
         blockBytes: Int,
         maxSteadyMs: Long? = null,
-    ): Double? {
+    ): BandwidthProbe.Reading? {
         val started = System.nanoTime()
         var deadline = started + BandwidthProbe.TIMEOUT_MS * 1_000_000
         var received = 0L
@@ -504,13 +504,10 @@ class PlaybackRepository @Inject constructor(
         if (failed) return null
         // Nixie (tv-1.0.1): nothing came before the read timed out: the link carries next to nothing, and the floor counts
         // (StreamBudget.FLOOR, as before 1.0.1). An answer without bytes says nothing.
-        if (received == 0L) return if (timedOut) 0.0 else null
-        val bps = BandwidthProbe.reading(
-            received,
-            lastAt - started,
-            received - firstBytes,
-            lastAt - firstAt,
-        )
+        if (received == 0L) return if (timedOut) BandwidthProbe.Reading(0.0) else null
+        val steadyBytes = received - firstBytes
+        val steadyNanos = lastAt - firstAt
+        val bps = BandwidthProbe.reading(received, lastAt - started, steadyBytes, steadyNanos)
         if (Log.verbose) {
             Log.d(
                 TAG,
@@ -518,7 +515,7 @@ class PlaybackRepository @Inject constructor(
                     "$received bytes in ${(lastAt - started) / 1_000_000} ms, ${StreamBudget.describe(bps)}",
             )
         }
-        return bps
+        return BandwidthProbe.Reading(bps, steadyBytes, steadyNanos)
     }
 
     /**
@@ -532,14 +529,15 @@ class PlaybackRepository @Inject constructor(
         // A small block first: on a slow link a big one takes many seconds. The second block is sized by the first result,
         // since a small one is over before a fast connection has sped up. The better of the two counts.
         // Nixie (tv-1.0.1): a slow first block is measured again too (it may be the connection warming up or the server's
-        // wait), never the whole test; the second runs at most SECOND_MAX_MS from its first byte.
-        var measured = downloadBps(session, BandwidthProbe.FIRST_BYTES) ?: return null
-        if (BandwidthProbe.needsSecond(measured)) {
+        // wait), unless it is a slow link with a solid sample; the second runs at most SECOND_MAX_MS from its first byte.
+        val first = downloadBps(session, BandwidthProbe.FIRST_BYTES) ?: return null
+        var measured = first.bitsPerSecond
+        if (BandwidthProbe.needsSecond(first)) {
             downloadBps(
                 session,
                 BandwidthProbe.secondBlock(measured),
                 maxSteadyMs = BandwidthProbe.SECOND_MAX_MS,
-            )?.let { measured = maxOf(measured, it) }
+            )?.let { measured = maxOf(measured, it.bitsPerSecond) }
         }
         // After a stall the stream's own numbers count too: the link may carry less than a short test shows.
         val value = synchronized(this) {
@@ -953,35 +951,36 @@ class PlaybackRepository @Inject constructor(
                 val first = info.mediaSources.firstOrNull()
                 // A live channel has no file bitrate worth comparing.
                 if (first != null && first.liveStreamId == null && first.bitrate != null) {
-                    val budget = if (verifying) {
-                        measuring?.await() ?: currentBudget()
-                    } else {
-                        currentBudget()
-                            ?: measuring?.await()
+                    // Judged on the unlimited answer, before it is replaced. A burned-in subtitle needs a new picture whatever the link.
+                    val playsAsIs = (first.supportsDirectPlay || first.supportsDirectStream) && !burnedIn(first)
+                    // Nixie (tv-1.0.1): a server that refused a smaller stream for this profile within the last day is not
+                    // asked again, and the file that plays as it is doesn't wait for the link test (it goes on behind, for
+                    // the next title); a server that refuses now leaves the file as it was (see askAgain).
+                    val original = playsAsIs && refusedBefore()
+                    val budget = when {
+                        original -> currentBudget()
+                        verifying -> measuring?.await() ?: currentBudget()
+                        else -> currentBudget() ?: measuring?.await()
                     }
                     if (budget != null && StreamBudget.exceeds(first.bitrate, budget)) {
-                        Log.i(
-                            TAG,
-                            "The file takes ${StreamBudget.describe(
-                                first.bitrate!!,
-                            )}, the link carries ${StreamBudget.describe(budget)}: asking for a stream that fits",
-                        )
-                        // Judged on the unlimited answer, before it is replaced. A burned-in subtitle needs a new picture whatever the link.
-                        fileFits = (first.supportsDirectPlay || first.supportsDirectStream) && !burnedIn(first)
-                        // Nixie (tv-1.0.1): a server that refused a smaller stream for this profile within the last day is
-                        // not asked again; one that refuses now leaves the file as it was (see askAgain).
-                        if (fileFits && refusedBefore()) {
+                        fileFits = playsAsIs
+                        if (original) {
                             smallerRefused = true
+                        } else {
                             Log.i(
                                 TAG,
-                                "The server refused a smaller stream for this profile earlier: playing the original",
+                                "The file takes ${StreamBudget.describe(
+                                    first.bitrate!!,
+                                )}, the link carries ${StreamBudget.describe(budget)}: asking for a stream that fits",
                             )
-                        } else if (!keepPicture(first, first.bitrate!!, budget) && !askAgain(budget) && fileFits) {
-                            keptFile("The server refused a stream that fits the link")
+                            if (!keepPicture(first, first.bitrate!!, budget) && !askAgain(budget) && fileFits) {
+                                keptFile("The server refused a stream that fits the link")
+                            }
                         }
                         // The file itself plays: there is no transcode to go back from.
                         if (smallerRefused) fileFits = false
                     }
+                    if (original) Log.i(TAG, "The server refused a smaller stream for this profile earlier: playing the original")
                 }
             }
             // A video the server has to transcode anyway is made for the display, not for the file's size: a 4K file

@@ -1,5 +1,6 @@
 package io.github.glacier_jellyfin.androidtv.core.data.playback
 
+import io.github.glacier_jellyfin.androidtv.core.data.playback.BandwidthProbe.Reading
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,14 +14,26 @@ class BandwidthProbeTest {
     }
 
     @Test
-    fun `a slow first block is measured again, never the whole test`() {
-        // 1.0.1: a first block of 2 s (524,288 bit/s) was the whole test, and read 440 kbit/s for streams on home Wi-Fi.
-        assertEquals(true, BandwidthProbe.needsSecond(524_288.0))
-        assertEquals(true, BandwidthProbe.needsSecond(400_000.0))
-        assertEquals(true, BandwidthProbe.needsSecond(0.0))
-        assertEquals(true, BandwidthProbe.needsSecond(50_000_000.0))
-        // Only a first block that already shows more than any stream may use is enough.
-        assertEquals(false, BandwidthProbe.needsSecond(200_000_000.0))
+    fun `a slow first reading with little behind it is measured again`() {
+        // 1.0.1: a first block of 2 s (524,288 bit/s), timed with the server's wait, was the whole test, and read 440 kbit/s
+        // for streams on home Wi-Fi.
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(518_000.0)))
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(400_000.0, steadyBytes = 8_192, steadyNanos = 160_000_000)))
+        // A read that timed out with no bytes.
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(0.0)))
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(50_000_000.0, 122_880, 19_660_800)))
+        // A first block that already shows more than any stream may use is enough.
+        assertEquals(false, BandwidthProbe.needsSecond(Reading(200_000_000.0)))
+    }
+
+    @Test
+    fun `a slow link with 64 KiB behind its first byte stands on one download`() {
+        // 120 KiB at 400 kbit/s after the first byte: a slow link, measured; a second download would add seconds.
+        assertEquals(false, BandwidthProbe.needsSecond(Reading(400_000.0, 122_880, 2_457_600_000)))
+        assertEquals(false, BandwidthProbe.needsSecond(Reading(BandwidthProbe.SLOW_BPS, 65_536, 1_000_000_000)))
+        // Faster than the line, or too little behind it: measured again.
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(BandwidthProbe.SLOW_BPS + 1, 122_880, 1_875_000_000)))
+        assertEquals(true, BandwidthProbe.needsSecond(Reading(400_000.0, 65_535, 1_310_700_000)))
     }
 
     @Test
